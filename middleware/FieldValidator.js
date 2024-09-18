@@ -3,7 +3,7 @@ const apiResponse = require("../utils/apiResponse");
 // Check Req contain the given key
 const ReqFieldValidator = (err, fields) => {
 	return (req, res, next) => {
-		for (let { location, keys, values, validatorCb, error } of fields) {
+		for (let { location, keys, values, validatorCb, setter, error } of fields) {
 			if (!location || !keys)
 				throw new Error("location and keys should be present");
 			// Check fields present
@@ -41,12 +41,22 @@ const ReqFieldValidator = (err, fields) => {
 					}),
 				);
 			}
+
+			// Set value to req
+			if (setter) {
+				for (const { fieldName, value } of setter(field)) {
+					res.locals[fieldName] = value;
+				}
+			}
 		}
 		next();
 	};
 };
 
-// Check header contain the given key
+/**
+ *  Middleware to check header contain the given key
+ * @param  {...string} headerKeys
+ */
 const HeaderFieldValidator =
 	(...headerKeys) =>
 	(req, res, next) => {

@@ -2,6 +2,16 @@ const jwt = require("jsonwebtoken");
 const Account = require("../model/account");
 const apiResponse = require("../utils/apiResponse");
 
+/**
+ * Middleware to authenticate JWT token attached to authroization header.
+ * Authentication involve verifying JWT token and rferencing with the accountId in DB.
+ * If successful, attach {acc, rawToken, decodedToken} to `res.locals` field for successive middleware to access
+ * @param {*} req Request Object
+ * @param {*} res Response Object
+ * @param {*} next Next middleware in chain
+ *
+ * - Notes: `acc`: account model field
+ */
 const JWTAuthentication = async (req, res, next) => {
 	try {
 		const token = req.header("Authorization").slice("Bearer ".length);

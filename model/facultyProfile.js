@@ -2,6 +2,27 @@ const mongoose = require("mongoose");
 
 const Schema = mongoose.Schema;
 
+const field = {
+	gender: ["male", "female", "other", "prefer not to say"],
+	facultyRoles: [
+		"principal",
+		"chairman",
+		"professor",
+		"guest professor",
+		"associate professor",
+		"guest lecturer",
+		"teaching assistant",
+		"male warden",
+		"female warden",
+		"dean",
+		"lab technician",
+		"administrative assistant",
+		"registrar",
+		"librarian",
+		"vice chancellor",
+	],
+};
+
 const FacultyProfileSchema = new Schema(
 	{
 		accountId: { type: Schema.Types.ObjectId, ref: "Account", required: true },
@@ -14,7 +35,7 @@ const FacultyProfileSchema = new Schema(
 		sex: {
 			type: String,
 			required: true,
-			enum: ["male", "female", "other", "prefer not to say"],
+			enum: field.gender,
 			default: "prefer not to say",
 		},
 		startDate: { type: Date, required: true },
@@ -23,30 +44,31 @@ const FacultyProfileSchema = new Schema(
 			ref: "Department",
 			required: true,
 		},
-		highestDegree: { type: String, required: true },
+		highestDegree: {
+			type: {
+				degreeName: { type: String, required: true },
+				instituteName: { type: String, required: true },
+			},
+			required: true,
+		},
 		expertFields: { type: [{ type: String }], required: true },
 		bios: { type: String, required: false },
+		published: {
+			type: [
+				{
+					title: { type: String, required: true },
+					type: { type: String, required: true },
+					year: { type: Number, required: true },
+					paperLink: { type: String, required: true },
+				},
+			],
+			required: false,
+		},
 		roles: {
 			type: [
 				{
 					type: String,
-					enum: [
-						"principal",
-						"chairman",
-						"professor",
-						"guest professor",
-						"associate professor",
-						"guest lecturer",
-						"teaching assistant",
-						"male warden",
-						"female warden",
-						"dean",
-						"lab technician",
-						"administrative assistant",
-						"registrar",
-						"librarian",
-						"vice chancellor",
-					],
+					enum: field.facultyRoles,
 				},
 			],
 			required: true,
@@ -56,5 +78,7 @@ const FacultyProfileSchema = new Schema(
 );
 
 // TODO: only one chairman, one principal implement in the business logic
-
-module.exports = mongoose.model("FacultyProfile", FacultyProfileSchema);
+module.exports = {
+	FacultyProfile: mongoose.model("FacultyProfile", FacultyProfileSchema),
+	field,
+};
