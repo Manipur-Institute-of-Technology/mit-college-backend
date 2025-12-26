@@ -11,7 +11,10 @@ const apiResponse = require("./utils/apiResponse");
 const accountRouter = require("./routers/Account");
 const adminRouter = require("./routers/Admin");
 const mailRouter = require("./routers/Mail");
-const notification = require("./routers/Notification")
+const notification = require("./routers/Notification");
+const download = require("./routers/Download");
+const information = require("./routers/Information");
+const department = require("./routers/Department");
 
 const app = express();
 
@@ -23,6 +26,9 @@ app.use("/mit/account", accountRouter);
 app.use("/mit/admin", adminRouter);
 app.use("/mit/mail", mailRouter);
 app.use("/mit/notification", notification);
+app.use("/mit/download", download);
+app.use("/mit/information", information);
+app.use("/mit/department", department);
 
 app.use((req, res, next) => {
 	return res.status(404).json(

@@ -1,25 +1,27 @@
 const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
 
 const Schema = mongoose.Schema;
 
-const FacultyProfileSchema = new Schema(
+const RequestFacultySchema = new Schema(
   {
-    accountId: {
-      type: Schema.Types.ObjectId,
-      ref: "Account",
-      required: true,
-      unique: true,
-    },
-
-    securityCode: {
+    email: {
       type: String,
       required: true,
+      lowercase: true,
       unique: true,
-      length: 6,
+    },
+    username: {
+      type: String,
+      required: true,
+      lowercase: true,
+    },
+    password: {
+      type: String,
+      required: true, // hashed here
     },
 
     photoId: { type: String, required: true },
-    email: { type: String, required: true },
     phoneNumber: { type: String, required: true },
     namePrefix: { type: String },
     firstName: { type: String, required: true },
@@ -72,4 +74,11 @@ const FacultyProfileSchema = new Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("FacultyProfile", FacultyProfileSchema);
+RequestFacultySchema.pre("save", async function (next) {
+  if (this.isModified("password")) {
+    this.password = await bcrypt.hash(this.password, +process.env.SALT);
+  }
+  next();
+});
+
+module.exports = mongoose.model("RequestFaculty", RequestFacultySchema);

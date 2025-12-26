@@ -55,13 +55,6 @@ const AccountSchema = new Schema(
 					);
 			},
 		},
-		status: {
-			type: String,
-			required: true,
-			// inactive: email not verified by OTP
-			enum: ["active", "pending", "reject", "inactive"],
-			default: "inactive",
-		},
 		accountType: {
 			type: String,
 			required: true,
@@ -84,7 +77,6 @@ const AccountSchema = new Schema(
 	},
 );
 
-// Hash Password
 AccountSchema.pre("save", async function (next) {
 	if (this.isModified("password")) {
 		const hashPassword = await bcrypt.hash(this.password, +process.env.SALT);
@@ -118,17 +110,15 @@ AccountSchema.methods.generateAuthToken = async function () {
   return token;
 };
 
-// check account credential is valid
 AccountSchema.statics.findAndCheckCredential = async function (
 	email,
 	password,
 	accountType,
 ) {
 	const user = await this.findOne({ email, accountType });
-	if (!user) throw new Error("email doesnt exist"); // Email doesnt exist
-	const match = await bcrypt.compare(password, user.password); // compare password hash
+	if (!user) throw new Error("email doesnt exist");
+	const match = await bcrypt.compare(password, user.password);
 	if (!match) {
-		// password doesnt match
 		throw new Error("password doesnt match");
 	}
 	return user;

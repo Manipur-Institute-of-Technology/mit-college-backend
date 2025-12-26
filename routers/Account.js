@@ -2,6 +2,9 @@ const express = require("express");
 const validator = require("validator");
 const apiResponse = require("../utils/apiResponse");
 const Account = require("../model/account")
+const RequestFaculty = require("../model/requestFaculty")
+const FacultyProfile = require("../model/facultyProfile")
+const generateSecurityCode = require("../utils/generateCodeRecovery")
 
 const {
 	ReqFieldValidator,
@@ -341,6 +344,149 @@ router.post(
 		],
 	),
 	changePasswordPost,
+);
+
+router.post("/requestfaculty", async (req, res) => {
+  try {
+    const exists = await RequestFaculty.findOne({ email: req.body.email });
+    if (exists) {
+      return res.status(400).json(
+        apiResponse(null, {
+          code: "REQUEST_ALREADY_EXISTS",
+          message: "Faculty request already submitted",
+        })
+      );
+    }
+
+    const request = new RequestFaculty(req.body);
+    await request.save();
+
+    res.status(201).json(
+      apiResponse({
+        message: "Faculty request submitted successfully",
+      })
+    );
+  } catch (err) {
+    res.status(500).json(
+      apiResponse(null, {
+        code: "REQUEST_FACULTY_ERROR",
+        message: err.toString(),
+      })
+    );
+  }
+});
+
+router.get(
+  "/requestfaculty",
+  JWTAuthentication,
+  Authorization(["admin"]),
+  async (req, res) => {
+    try {
+      const requests = await RequestFaculty.find()
+        .populate("departmentId", "name")
+        .sort({ createdAt: -1 });
+
+      res.json(
+        apiResponse({
+          count: requests.length,
+          requests,
+        })
+      );
+    } catch (err) {
+      res.status(500).json(
+        apiResponse(null, {
+          code: "FETCH_REQUESTS_FAILED",
+          message: err.toString(),
+        })
+      );
+    }
+  }
+);
+
+router.post(
+  "/requestfaculty/accept/:id",
+  JWTAuthentication,
+  Authorization(["admin"]),
+  async (req, res) => {
+    try {
+      const request = await RequestFaculty.findById(req.params.id);
+      if (!request) {
+        return res.status(404).json({ error: "Request not found" });
+      }
+
+      const account = new Account({
+        email: request.email,
+        username: request.username,
+        password: request.password,
+        accountType: "faculty",
+      });
+
+      account._passwordAlreadyHashed = true;
+      await account.save();
+
+      const securityCode = await generateSecurityCode(FacultyProfile);
+
+      await FacultyProfile.create({
+        accountId: account._id,
+        securityCode,
+        email: request.email,
+        photoId: request.photoId,
+        phoneNumber: request.phoneNumber,
+        firstName: request.firstName,
+        lastName: request.lastName,
+        sex: request.sex,
+        startDate: request.startDate,
+        departmentId: request.departmentId,
+        highestDegree: request.highestDegree,
+        expertFields: request.expertFields,
+        bios: request.bios,
+        roles: request.roles,
+      });
+
+      await request.deleteOne();
+
+      res.json({
+        message: "Faculty approved successfully",
+        securityCode,
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  }
+);
+
+router.delete(
+  "/requestfaculty/delete/:id",
+  JWTAuthentication,
+  Authorization(["admin"]),
+  async (req, res) => {
+    try {
+      const request = await RequestFaculty.findById(req.params.id);
+      if (!request) {
+        return res.status(404).json(
+          apiResponse(null, {
+            code: "REQUEST_NOT_FOUND",
+            message: "Faculty request not found",
+          })
+        );
+      }
+
+      await request.deleteOne();
+
+      res.json(
+        apiResponse({
+          message: "Faculty request deleted successfully",
+        })
+      );
+    } catch (err) {
+      res.status(500).json(
+        apiResponse(null, {
+          code: "DELETE_REQUEST_FAILED",
+          message: err.toString(),
+        })
+      );
+    }
+  }
 );
 
 module.exports = router;
