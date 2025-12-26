@@ -68,6 +68,16 @@ const AccountSchema = new Schema(
 			enum: ["faculty", "admin"],
 			default: "faculty",
 		},
+		tokens: {
+				type: [
+					{
+					token: {
+						type: String
+					}
+					}
+				],
+				default: []
+				}
 	},
 	{
 		timestamps: true,
@@ -89,17 +99,23 @@ AccountSchema.pre("save", async function (next) {
 	next();
 });
 
-// Generate JWT Token
-AccountSchema.methods.generateAuthToken = function () {
-	console.log("JWT Generator", this._id, this._id.toString());
-	const token = jwt.sign(
-		{
-			id: this._id.toString(),
-		},
-		process.env.JWT_SECRET,
-		{ algorithm: "HS256", expiresIn: "1d" },
-	);
-	return token;
+AccountSchema.methods.generateAuthToken = async function () {
+  const account = this;
+
+  const token = jwt.sign(
+    {
+      id: account._id.toString(),
+      accountType: account.accountType,
+    },
+    process.env.JWT_SECRET
+  );
+
+  account.tokens = account.tokens || [];
+  account.tokens.push({ token });
+
+  await account.save();
+
+  return token;
 };
 
 // check account credential is valid

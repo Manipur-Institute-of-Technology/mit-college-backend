@@ -1,12 +1,17 @@
-const mailSender = require("../utils/mailSender");
+const { mailSender } = require("../utils/mailSender");
 const otpGen = require("otp-generator");
 
-const otpToken = otpGen.generate(8, { specialChars: false });
+const otpToken = otpGen.generate(8, {
+	upperCaseAlphabets: false,
+	lowerCaseAlphabets: false,
+	specialChars: false,
+});
 
 mailSender(
-	"TEST OTP",
+	"receiver@gmail.com",
+	"OTP Verification",
 	`<h1>Please confirm your OTP</h1>
-       <p>Here is your OTP code: ${otpToken}</p>`,
+     <p>Here is your OTP code: <b>${otpToken}</b></p>`
 )
-	.then((d) => console.log(d))
-	.catch((err) => console.error(err));
+	.then((info) => console.log("Mail sent:", info.messageId))
+	.catch((err) => console.error("Mail error:", err.message));

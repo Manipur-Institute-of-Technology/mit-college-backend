@@ -10,6 +10,8 @@ const apiResponse = require("./utils/apiResponse");
 
 const accountRouter = require("./routers/Account");
 const adminRouter = require("./routers/Admin");
+const mailRouter = require("./routers/Mail");
+const notification = require("./routers/Notification")
 
 const app = express();
 
@@ -17,12 +19,11 @@ app.use(logger("dev"));
 app.use(cors());
 app.use(express.json());
 
-// API Routes
-app.use("/api/account", accountRouter);
-app.use("/api/admin", adminRouter);
-///////////////////////////////////////////
+app.use("/mit/account", accountRouter);
+app.use("/mit/admin", adminRouter);
+app.use("/mit/mail", mailRouter);
+app.use("/mit/notification", notification);
 
-// 404 Handler
 app.use((req, res, next) => {
 	return res.status(404).json(
 		apiResponse(null, {
@@ -32,7 +33,7 @@ app.use((req, res, next) => {
 	);
 });
 
-// General Error handler
+
 app.use((err, req, res, next) => {
 	console.error(err.stack);
 	return res.status(500).send(
@@ -43,8 +44,24 @@ app.use((err, req, res, next) => {
 	);
 });
 
-app.listen(process.env.PORT, () =>
-	console.log(`Listening on port: ${process.env.PORT}...`),
-);
+const os = require("os");
 
-// TODO: Add init function to add default admin
+const getHost = () => {
+  const nets = os.networkInterfaces();
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]) {
+      if (net.family === "IPv4" && !net.internal) {
+        return net.address;
+      }
+    }
+  }
+  return "127.0.0.1";
+};
+
+app.listen(process.env.PORT, () => {
+	const host = getHost();
+	console.log(`Listening on port: http://${host}:${process.env.PORT}`);
+});
+
+
+

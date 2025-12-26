@@ -17,6 +17,10 @@ const NotifSchema = new Schema(
 			ref: "Account",
 			required: true,
 		},
+		active_date: {
+			type: Date,
+			required: true,
+		}
 	},
 	{ timestamps: true },
 );

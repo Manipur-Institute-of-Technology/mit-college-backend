@@ -1,9 +1,5 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
-const otpGen = require("otp-generator");
-
-const permToken = require("./permToken");
-// const mailSender = require();
 
 const Schema = mongoose.Schema;
 
@@ -13,50 +9,44 @@ const OTPTokenSchema = new Schema(
 			type: Schema.Types.ObjectId,
 			ref: "Account",
 			required: true,
-			expires: "60s",
 			index: true,
 		},
 		token: {
-			type: String,
+			type: String, // hashed OTP
 			required: true,
-			expires: "60s",
 		},
 		validDuration: {
-			type: Number, // in minutes
+			type: Number, // minutes
 			required: true,
 		},
-		verified: { type: Boolean, default: false, required: true },
+		verified: {
+			type: Boolean,
+			default: false,
+		},
 		verificationType: {
 			type: String,
-			required: true,
 			enum: ["mailVerification", "forgotPassword"],
 			default: "mailVerification",
 		},
-		expiredAt: {
+		expiresAt: {
 			type: Date,
-			default: Date.now() + 1 * 60 * 1000, // expires in 1 minutes
-			expireAfterSeconds: 10,
-			index: true,
+			default: () => Date.now() + 5 * 60 * 1000, // 5 minutes
+			index: { expires: 0 }, // TTL index
 		},
 	},
-	{
-		timestamps: true,
-	},
+	{ timestamps: true },
 );
 
-OTPTokenSchema.methods.verifyToken = async function (otpTokenStr) {
-	const tokenDuration = this.validDuration * 1000 * 60; // in minutes
-	const tokenIssue = new Date(this.updatedAt).getTime();
+OTPTokenSchema.methods.verifyToken = async function (otp) {
+	if (Date.now() > this.expiresAt.getTime()) {
+		throw new Error("OTP expired");
+	}
 
-	// Check OTP expiry
-	if (Date.now() > tokenDuration + tokenIssue) {
-		throw new Error("OTP Token expired");
-	}
-	// comparre token Str
-	const tokenCompare = await bcrypt.compare(otpTokenStr, this.token);
-	if (!tokenCompare) {
-		throw new Error("Incorrect OTP Token");
-	}
+	const match = await bcrypt.compare(otp, this.token);
+	if (!match) throw new Error("Invalid OTP");
+
+	this.verified = true;
+	await this.save();
 	return true;
 };
 

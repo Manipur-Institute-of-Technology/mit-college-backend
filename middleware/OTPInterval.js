@@ -3,28 +3,26 @@ const OTPToken = require("../model/otpToken");
 const apiResponse = require("../utils/apiResponse");
 
 const OTPInterval = (interval, verificationType) => async (req, res, next) => {
-	const _otpToken = await OTPToken.findOne({
+	const token = await OTPToken.findOne({
 		accountID: res.locals.decodedToken.id,
 		verificationType,
-	});
-	// First entry
-	if (!_otpToken) return next();
+	}).sort({ updatedAt: -1 });
 
-	// check for interval
-	const isUnderInterval =
-		Date.now() < new Date(_otpToken.updatedAt).getTime() + interval * 60 * 1000;
+	if (!token) return next();
 
-	if (isUnderInterval) {
-		res.status(401).json(
+	const nextAllowed =
+		new Date(token.updatedAt).getTime() + interval * 1000;
+
+	if (Date.now() < nextAllowed) {
+		return res.status(429).json(
 			apiResponse(null, {
 				code: "OTP_SERVICE_ERROR",
-				message: `OTP can be request in ${interval} minute interval`,
-			}),
+				message: `OTP can be requested after ${interval} minutes`,
+			})
 		);
-		return false;
 	}
 	next();
-	return true;
 };
 
 module.exports = OTPInterval;
+

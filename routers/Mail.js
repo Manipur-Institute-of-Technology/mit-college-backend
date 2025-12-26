@@ -1,41 +1,66 @@
 const express = require("express");
-const Auth = require("../middleware/auth");
-
-const Mail = require("../model/mail");
-
 const router = new express.Router();
 
+const Mail = require("../model/mail");
+const jwtAuth = require("../middleware/JWTAuthentication");
+const Authorization = require("../middleware/Authorization");
+
 router.post("/SendMail", async (req, res) => {
-  console.log("Send Mail Hit ", req.body);
-  const mail = new Mail(req.body);
-  try {
-    await mail.save();
-    res.status(201).send({ error: "Success" });
-  } catch (error) {
-    res.status(400).send({ error: "Error In Sending Mail" });
-  }
+	try {
+		const newMail = new Mail(req.body);
+		await newMail.save();
+
+		res.status(201).json({
+			message: "Mail sent successfully",
+		});
+	} catch (error) {
+		res.status(400).json({
+			error: error.message,
+		});
+	}
 });
 
-router.get("/GetMails", async (req, res) => {
-  try {
-    let mails = [];
-    mails = await Mail.find({}).sort({ _id: -1 });
-    res.status(201).send(mails);
-  } catch (error) {
-    res.status(400).send(error);
-  }
-});
+router.get(
+	"/GetMails",
+	jwtAuth,
+	Authorization(["admin"], ["active"]),
+	async (req, res) => {
+		try {
+			const mails = await Mail.find({}).sort({ _id: -1 });
+			res.status(200).json(mails);
+		} catch (error) {
+			res.status(400).json({
+				error: "Failed to fetch mails",
+			});
+		}
+	}
+);
 
-router.delete("/DeleteMail/:_id", Auth, async (req, res) => {
-  console.log("Delete Mail API Hit!!!");
-  try {
-    const deletemail = await Mail.findOneAndDelete({ _id: req.params._id });
-    if (deletemail) {
-      return res.send({ error: "Mail Deleted" });
-    }
-  } catch (error) {
-    res.status(400).send({ error: "Mail Delete Failed" });
-  }
-});
+router.delete(
+	"/DeleteMail/:_id",
+	jwtAuth,
+	Authorization(["admin"], ["active"]),
+	async (req, res) => {
+		try {
+			const deletedMail = await Mail.findOneAndDelete({
+				_id: req.params._id,
+			});
+
+			if (!deletedMail) {
+				return res.status(404).json({
+					error: "Mail not found",
+				});
+			}
+
+			res.status(200).json({
+				message: "Mail deleted successfully",
+			});
+		} catch (error) {
+			res.status(400).json({
+				error: "Mail delete failed",
+			});
+		}
+	}
+);
 
 module.exports = router;

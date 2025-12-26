@@ -1,5 +1,7 @@
 const express = require("express");
 const validator = require("validator");
+const apiResponse = require("../utils/apiResponse");
+const Account = require("../model/account")
 
 const {
 	ReqFieldValidator,
@@ -85,9 +87,111 @@ router.post(
 			},
 		],
 	),
-	// ValidateSignupField,
 	signupPostHandler,
 );
+
+router.post("/logout", async (req, res) => {
+  try {
+    const { email, token } = req.body;
+
+    const user = await Account.findOne({ email });
+    if (!user) {
+      return res.status(404).send(
+        apiResponse(null, {
+          code: "USER_NOT_FOUND",
+          message: "Account not found",
+        })
+      );
+    }
+
+    user.tokens = user.tokens.filter((t) => t.token !== token);
+    await user.save();
+
+    res.status(200).send(
+      apiResponse({
+        message: "Logged out successfully",
+      })
+    );
+  } catch (err) {
+    res.status(500).send(
+      apiResponse(null, {
+        code: "LOGOUT_ERROR",
+        message: err.toString(),
+      })
+    );
+  }
+});
+
+router.post("/logoutAll", async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    const user = await Account.findOne({ email });
+    if (!user) {
+      return res.status(404).send(
+        apiResponse(null, {
+          code: "USER_NOT_FOUND",
+          message: "Account not found",
+        })
+      );
+    }
+
+    user.tokens = [];
+    await user.save();
+
+    res.status(200).send(
+      apiResponse({
+        message: "Logged out from all devices",
+      })
+    );
+  } catch (err) {
+    res.status(500).send(
+      apiResponse(null, {
+        code: "LOGOUT_ALL_ERROR",
+        message: err.toString(),
+      })
+    );
+  }
+});
+
+router.delete("/delete", async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).send(
+        apiResponse(null, {
+          code: "MISSING_EMAIL",
+          message: "Email is required",
+        })
+      );
+    }
+
+    const account = await Account.findOneAndDelete({ email });
+
+    if (!account) {
+      return res.status(404).send(
+        apiResponse(null, {
+          code: "USER_NOT_FOUND",
+          message: "Account not found",
+        })
+      );
+    }
+
+    res.status(200).send(
+      apiResponse({
+        message: "Account deleted successfully",
+      })
+    );
+  } catch (err) {
+    res.status(500).send(
+      apiResponse(null, {
+        code: "DELETE_ACCOUNT_ERROR",
+        message: err.toString(),
+      })
+    );
+  }
+});
 
 router.get(
 	"/verify/email",
@@ -119,7 +223,7 @@ router.post(
 
 // TODO: Implement controller
 router.get(
-	"/forgotpassword/otp",
+	"/forgotpassword",
 	ReqFieldValidator(
 		{
 			code: "MISSING_REQ_FIELD",
@@ -209,14 +313,6 @@ router.post(
 	),
 	forgotPasswordVerifyOTPPost,
 );
-
-// TODO: Check permtoken regeneration controller
-// router.get(
-// 	"/status",
-// 	HeaderFieldValidator("Authorization"),
-// 	JWTAuthentication,
-// 	async (req, res) => {},
-// );
 
 router.post(
 	"/changepassword/",
