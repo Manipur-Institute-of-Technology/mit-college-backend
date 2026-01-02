@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-
 const Schema = mongoose.Schema;
 
 const FacultyProfileSchema = new Schema(
@@ -11,16 +10,10 @@ const FacultyProfileSchema = new Schema(
       unique: true,
     },
 
-    securityCode: {
-      type: String,
-      required: true,
-      unique: true,
-      length: 6,
-    },
-
     photoId: { type: String, required: true },
     email: { type: String, required: true },
     phoneNumber: { type: String, required: true },
+
     namePrefix: { type: String },
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
@@ -41,7 +34,6 @@ const FacultyProfileSchema = new Schema(
 
     highestDegree: { type: String, required: true },
     expertFields: [{ type: String, required: true }],
-    bios: { type: String },
 
     roles: {
       type: [

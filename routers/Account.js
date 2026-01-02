@@ -4,7 +4,6 @@ const apiResponse = require("../utils/apiResponse");
 const Account = require("../model/account")
 const RequestFaculty = require("../model/requestFaculty")
 const FacultyProfile = require("../model/facultyProfile")
-const generateSecurityCode = require("../utils/generateCodeRecovery")
 
 const {
 	ReqFieldValidator,
@@ -424,11 +423,8 @@ router.post(
       account._passwordAlreadyHashed = true;
       await account.save();
 
-      const securityCode = await generateSecurityCode(FacultyProfile);
-
       await FacultyProfile.create({
         accountId: account._id,
-        securityCode,
         email: request.email,
         photoId: request.photoId,
         phoneNumber: request.phoneNumber,
@@ -439,7 +435,6 @@ router.post(
         departmentId: request.departmentId,
         highestDegree: request.highestDegree,
         expertFields: request.expertFields,
-        bios: request.bios,
         roles: request.roles,
       });
 
@@ -447,7 +442,6 @@ router.post(
 
       res.json({
         message: "Faculty approved successfully",
-        securityCode,
       });
     } catch (err) {
       res.status(500).json({ error: err.message });

@@ -3,7 +3,11 @@ const path = require("path");
 const fs = require("fs");
 
 function createUploader(folderName) {
-	const uploadDir = path.join(__dirname, "..", "uploads", folderName);
+	const uploadDir = path.join(
+		process.cwd(),
+		"uploads",
+		folderName
+	);
 
 	if (!fs.existsSync(uploadDir)) {
 		fs.mkdirSync(uploadDir, { recursive: true });

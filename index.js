@@ -15,6 +15,8 @@ const notification = require("./routers/Notification");
 const download = require("./routers/Download");
 const information = require("./routers/Information");
 const department = require("./routers/Department");
+const gallery = require("./routers/Gallery")
+const image = require("./routers/Image")
 
 const app = express();
 
@@ -29,6 +31,8 @@ app.use("/mit/notification", notification);
 app.use("/mit/download", download);
 app.use("/mit/information", information);
 app.use("/mit/department", department);
+app.use("/mit/gallery", gallery);
+app.use("/mit/image", image);
 
 app.use((req, res, next) => {
 	return res.status(404).json(

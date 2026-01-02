@@ -25,7 +25,7 @@ router.get(
 	"/getaccounts",
 	HeaderFieldValidator("Authorization"),
 	JWTAuthentication,
-	Authorization(["admin"], ["active"]),
+	Authorization(["admin"]),
 	getAccountsGet,
 );
 
@@ -33,7 +33,7 @@ router.get(
 	"/getaccounts/filter",
 	HeaderFieldValidator("Authorization"),
 	JWTAuthentication,
-	Authorization(["admin"], ["active"]),
+	Authorization(["admin"]),
 	ReqFieldValidator(
 		{
 			code: "MISSING_QUERY_PARAMS",
@@ -59,7 +59,7 @@ router.get(
 	"/account/search/email",
 	HeaderFieldValidator("Authorization"),
 	JWTAuthentication,
-	Authorization(["admin"], ["active"]),
+	Authorization(["admin"]),
 	ReqFieldValidator(
 		{
 			code: "MISSING_FORM_FIELD",
@@ -83,7 +83,7 @@ router.get(
 	"/account/search/username",
 	HeaderFieldValidator("Authorization"),
 	JWTAuthentication,
-	Authorization(["admin"], ["active"]),
+	Authorization(["admin"]),
 	ReqFieldValidator(
 		{
 			code: "MISSING_FORM_FIELD",
@@ -108,7 +108,7 @@ router.patch(
 	"/account/",
 	HeaderFieldValidator("Authorization"),
 	JWTAuthentication,
-	Authorization(["admin"], ["active"]),
+	Authorization(["admin"]),
 	ReqFieldValidator(
 		{
 			code: "MISSING_FORM_FIELD",
@@ -134,7 +134,7 @@ router.delete(
 	"/account/",
 	HeaderFieldValidator("Authorization"),
 	JWTAuthentication,
-	Authorization(["admin"], ["active"]),
+	Authorization(["admin"]),
 	ReqFieldValidator(
 		{
 			code: "MISSING_FORM_FIELD",
@@ -155,7 +155,7 @@ router.get(
 	"/account/detail/:accountId",
 	HeaderFieldValidator("Authorization"),
 	JWTAuthentication,
-	Authorization(["admin"], ["active"]),
+	Authorization(["admin"]),
 	ReqFieldValidator(
 		{
 			code: "MISSING_FORM_FIELD",
