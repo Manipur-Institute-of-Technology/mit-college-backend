@@ -18,33 +18,32 @@ const RequestFacultySchema = new Schema(
     },
     password: {
       type: String,
-      required: true, // hashed here
+      required: true,
     },
-
     photoId: { type: String, required: true },
     phoneNumber: { type: String, required: true },
     namePrefix: { type: String },
     firstName: { type: String, required: true },
+    middleName: { type: String, required: true },
     lastName: { type: String, required: true },
-
     sex: {
       type: String,
       enum: ["male", "female", "other", "prefer not to say"],
       default: "prefer not to say",
     },
-
     startDate: { type: Date, required: true },
-
     departmentId: {
       type: Schema.Types.ObjectId,
       ref: "Department",
       required: true,
     },
-
+    hod: {
+      type: Boolean,
+      required: true,
+    },
     highestDegree: { type: String, required: true },
     expertFields: [{ type: String, required: true }],
-    bios: { type: String },
-
+    bios: { type: String, required: false },
     roles: {
       type: [
         {

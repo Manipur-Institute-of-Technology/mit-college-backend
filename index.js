@@ -15,8 +15,10 @@ const notification = require("./routers/Notification");
 const download = require("./routers/Download");
 const information = require("./routers/Information");
 const department = require("./routers/Department");
-const gallery = require("./routers/Gallery")
-const image = require("./routers/Image")
+const gallery = require("./routers/Gallery");
+const image = require("./routers/Image");
+const authority = require("./routers/Authority");
+const sideAdmin = require("./routers/SideAdmin");
 
 const app = express();
 
@@ -33,6 +35,8 @@ app.use("/mit/information", information);
 app.use("/mit/department", department);
 app.use("/mit/gallery", gallery);
 app.use("/mit/image", image);
+app.use("/mit/authority", authority);
+app.use("/mit/sideadmin", sideAdmin);
 
 app.use((req, res, next) => {
 	return res.status(404).json(

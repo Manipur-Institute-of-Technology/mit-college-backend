@@ -412,38 +412,42 @@ router.post(
       if (!request) {
         return res.status(404).json({ error: "Request not found" });
       }
-
       const account = new Account({
         email: request.email,
         username: request.username,
         password: request.password,
         accountType: "faculty",
       });
-
       account._passwordAlreadyHashed = true;
       await account.save();
-
       await FacultyProfile.create({
         accountId: account._id,
         email: request.email,
-        photoId: request.photoId,
         phoneNumber: request.phoneNumber,
+        photoId: request.photoId,
+        namePrefix: request.namePrefix,
         firstName: request.firstName,
+        middleName: request.middleName,
         lastName: request.lastName,
         sex: request.sex,
         startDate: request.startDate,
         departmentId: request.departmentId,
+        hod: request.hod,
         highestDegree: request.highestDegree,
         expertFields: request.expertFields,
         roles: request.roles,
+        bios: request.bios,
+        contactInfo: [],
       });
 
       await request.deleteOne();
 
       res.json({
+        success: true,
         message: "Faculty approved successfully",
       });
     } catch (err) {
+      console.error("ACCEPT FACULTY ERROR:", err);
       res.status(500).json({ error: err.message });
     }
   }

@@ -9,32 +9,49 @@ const FacultyProfileSchema = new Schema(
       required: true,
       unique: true,
     },
-
     photoId: { type: String, required: true },
     email: { type: String, required: true },
     phoneNumber: { type: String, required: true },
-
+    contactInfo: {
+      type: [
+        {
+          type: {
+            type: String,
+            required: true,
+          },
+          value: {
+            type: String,
+            required: true,
+          },
+        },
+      ],
+      required: false,
+    },
     namePrefix: { type: String },
     firstName: { type: String, required: true },
+    middleName: { type: String, required: false},
     lastName: { type: String, required: true },
-
     sex: {
       type: String,
       enum: ["male", "female", "other", "prefer not to say"],
       default: "prefer not to say",
     },
-
     startDate: { type: Date, required: true },
-
     departmentId: {
       type: Schema.Types.ObjectId,
       ref: "Department",
       required: true,
     },
-
+    hod: {
+      type: Boolean,
+      required: true,
+    },
+    bios:{
+      type: String,
+      required: false,
+    },
     highestDegree: { type: String, required: true },
     expertFields: [{ type: String, required: true }],
-
     roles: {
       type: [
         {
