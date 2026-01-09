@@ -19,6 +19,7 @@ const gallery = require("./routers/Gallery");
 const image = require("./routers/Image");
 const authority = require("./routers/Authority");
 const sideAdmin = require("./routers/SideAdmin");
+const studentList = require("./routers/StudentList");
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.use("/mit/gallery", gallery);
 app.use("/mit/image", image);
 app.use("/mit/authority", authority);
 app.use("/mit/sideadmin", sideAdmin);
+app.use("/mit/studentlist", studentList);
 
 app.use((req, res, next) => {
 	return res.status(404).json(
