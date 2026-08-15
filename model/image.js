@@ -1,24 +1,52 @@
 const mongoose = require("mongoose");
-const Schema = mongoose.Schema;
 
-const ImageSchema = new Schema(
-	{
-		imageUrl: {
-			type: String,
-			required: true,
-		},
-		caption: {
-			type: String,
-			maxLength: 200,
-		},
+const ImageSchema = new mongoose.Schema(
+  {
+    filename: {
+      type: String,
+      required: true,
+      trim: true,
+    },
 
-		gallery: {
-			type: Schema.Types.ObjectId,
-			ref: "Gallery",
-			required: true,
-		},
-	},
-	{ timestamps: true },
+    path: {
+      type: String,
+      default: "",
+    },
+
+    imageUrl: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    caption: {
+      type: String,
+      maxlength: 200,
+      default: "",
+      trim: true,
+    },
+
+    size: {
+      type: Number,
+      default: 0,
+    },
+
+    mimetype: {
+      type: String,
+      default: "",
+    },
+
+    gallery: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Gallery",
+      required: true,
+    },
+  },
+  {
+    timestamps: true,
+  }
 );
 
-module.exports = mongoose.model("Image", ImageSchema);
+module.exports =
+  mongoose.models.Image ||
+  mongoose.model("Image", ImageSchema);

@@ -23,7 +23,7 @@ router.post("/SendMail", async (req, res) => {
 router.get(
 	"/GetMails",
 	jwtAuth,
-	Authorization(["admin"], ["active"]),
+	Authorization(["admin"]),
 	async (req, res) => {
 		try {
 			const mails = await Mail.find({}).sort({ _id: -1 });
@@ -39,7 +39,7 @@ router.get(
 router.delete(
 	"/DeleteMail/:_id",
 	jwtAuth,
-	Authorization(["admin"], ["active"]),
+	Authorization(["admin"]),
 	async (req, res) => {
 		try {
 			const deletedMail = await Mail.findOneAndDelete({

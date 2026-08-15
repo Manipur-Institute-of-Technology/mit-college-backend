@@ -14,83 +14,231 @@ const htmlMailVerifyOTPTemplate = require("../../template/mailVerifyOTPTemplate"
 const OTPInterval = require("../../middleware/OTPInterval");
 
 const forgotPasswordGet = async (req, res) => {
-	const { email, accountType } = req.body;
+    const { email, accountType } = req.body;
 
-	try {
-		// Check email exist in account collection
-		const _acc = await account.findOne({ email, accountType });
-		if (!_acc) {
-			return res.status(401).json(
-				apiResponse(null, {
-					code: "INVALID_REQ_FIELD",
-					message: "email doesnt exist",
-				}),
-			);
-		}
-		// Check OTP interval
-		res.locals.decodedToken = { id: _acc._id.toString() };
+    try {
+        // =====================================================
+        // VALIDATE EMAIL
+        // =====================================================
 
-		// const isValid = await OTPInterval(1, "forgotPassword")(req, res, () => {});
-		// if (!isValid) return; // res already sent
-		await OTPInterval(1, "forgotPassword")(req, res, () => {});
-		if (res.headersSent) return; // res already sent
+        if (!email) {
+            return res.status(400).json(
+                apiResponse(null, {
+                    code: "EMAIL_REQUIRED",
+                    message: "Email is required",
+                })
+            );
+        }
 
-		// Generate OTP token and store in DB
-		const otpTokenStr = otpGen.generate(+process.env.OTP_TOKEN_LEN, {
-			specialChars: false,
-		});
+        if (!["admin", "faculty"].includes(accountType)) {
+            return res.status(400).json(
+                apiResponse(null, {
+                    code: "INVALID_ACCOUNT_TYPE",
+                    message: "Invalid account type",
+                })
+            );
+        }
 
-		const _otpToken = await otpToken.findOneAndUpdate(
-			{ accountID: _acc._id, verificationType: "forgotPassword" },
-			{
-				token: await bcrypt.hash(otpTokenStr, +process.env.SALT),
-				validDuration: process.env.OTP_TOKEN_DURATION,
-				verified: false,
-			},
-			{
-				new: true,
-				upsert: true,
-			},
-		);
+        const normalizedEmail =
+            email.trim().toLowerCase();
 
-		// Send OTP to registered email
-		await sendMail(
-			_acc.email,
-			"Forgot Password",
-			htmlMailVerifyOTPTemplate({
-				otpToken: otpTokenStr,
-				otpTokenDuration: `${process.env.OTP_TOKEN_DURATION} minutes`,
-			}),
-		);
-		if (process.env.ENV === "dev") {
-			console.log("OTP token: ", otpTokenStr);
-			console.log(
-				htmlMailVerifyOTPTemplate({
-					otpToken: otpTokenStr,
-					otpTokenDuration: `${process.env.OTP_TOKEN_DURATION} minutes`,
-				}),
-			);
-		}
+        // =====================================================
+        // FIND ACCOUNT
+        // =====================================================
 
-		// use the optId to verify
-		res.status(201).json(
-			apiResponse({
-				message: `OTP send to ${_acc.email} successfully`,
-				otpId: jwt.sign({ id: _otpToken._id }, process.env.JWT_SECRET, {
-					algorithm: "HS256",
-					expiresIn: `${process.env.OTP_TOKEN_DURATION}m`,
-				}),
-			}),
-		);
-	} catch (err) {
-		console.error(err);
-		res.status(401).json(
-			apiResponse(null, {
-				code: "SERVER_ERROR",
-				message: err.toString(),
-			}),
-		);
-	}
+        const _acc = await account.findOne({
+            email: normalizedEmail,
+            accountType,
+        });
+
+        if (!_acc) {
+            return res.status(404).json(
+                apiResponse(null, {
+                    code: "ACCOUNT_NOT_FOUND",
+                    message:
+                        "No account exists with this email.",
+                })
+            );
+        }
+
+        // =====================================================
+        // OTP RATE LIMIT
+        // =====================================================
+
+        res.locals.decodedToken = {
+            id: _acc._id.toString(),
+        };
+
+        await OTPInterval(
+            1,
+            "forgotPassword"
+        )(req, res, () => {});
+
+        if (res.headersSent) {
+            return;
+        }
+
+        // =====================================================
+        // GENERATE NUMERIC OTP
+        // =====================================================
+		console.log("OTP_TOKEN_LEN from ENV:", process.env.OTP_TOKEN_LEN);
+		console.log("OTP length:", Number(process.env.OTP_TOKEN_LEN));
+
+        const otpTokenStr = otpGen.generate(
+            Number(process.env.OTP_TOKEN_LEN),
+            {
+                digits: true,
+                upperCaseAlphabets: false,
+                lowerCaseAlphabets: false,
+                specialChars: false,
+            }
+        );
+
+        // =====================================================
+        // HASH OTP
+        // =====================================================
+
+        const hashedOTP = await bcrypt.hash(
+            otpTokenStr,
+            Number(process.env.SALT)
+        );
+
+        // =====================================================
+        // STORE OTP
+        // =====================================================
+
+        const _otpToken =
+            await otpToken.findOneAndUpdate(
+                {
+                    accountID: _acc._id,
+                    verificationType:
+                        "forgotPassword",
+                },
+                {
+                    token: hashedOTP,
+
+                    validDuration:
+                        Number(
+                            process.env
+                                .OTP_TOKEN_DURATION
+                        ),
+
+                    verified: false,
+
+                    expiresAt:
+                        new Date(
+                            Date.now() +
+                                Number(
+                                    process.env
+                                        .OTP_TOKEN_DURATION
+                                ) *
+                                60 *
+                                1000
+                        ),
+                },
+                {
+                    new: true,
+                    upsert: true,
+                }
+            );
+
+        // =====================================================
+        // SEND OTP EMAIL
+        // =====================================================
+
+        await sendMail(
+            _acc.email,
+            "Forgot Password - OTP",
+            htmlMailVerifyOTPTemplate({
+                otpToken: otpTokenStr,
+                otpTokenDuration:
+                    `${process.env.OTP_TOKEN_DURATION} minutes`,
+            })
+        );
+
+        // =====================================================
+        // DEVELOPMENT LOG
+        // =====================================================
+
+        if (process.env.ENV === "dev") {
+            console.log(
+                "================================="
+            );
+
+            console.log(
+                "FORGOT PASSWORD OTP:"
+            );
+
+            console.log(
+                "Email:",
+                _acc.email
+            );
+
+            console.log(
+                "Account Type:",
+                _acc.accountType
+            );
+
+            console.log(
+                "OTP:",
+                otpTokenStr
+            );
+
+            console.log(
+                "================================="
+            );
+        }
+
+        // =====================================================
+        // CREATE OTP ID TOKEN
+        // =====================================================
+
+        const otpId = jwt.sign(
+            {
+                id: _otpToken._id,
+            },
+            process.env.JWT_SECRET,
+            {
+                algorithm: "HS256",
+                expiresIn:
+                    `${process.env.OTP_TOKEN_DURATION}m`,
+            }
+        );
+
+        // =====================================================
+        // RESPONSE
+        // =====================================================
+
+        return res.status(201).json(
+            apiResponse({
+                message:
+                    `OTP sent to ${_acc.email} successfully`,
+
+                otpId,
+
+                expiresIn:
+                    Number(
+                        process.env
+                            .OTP_TOKEN_DURATION
+                    ) * 60,
+            })
+        );
+
+    } catch (err) {
+        console.error(
+            "FORGOT PASSWORD OTP ERROR:",
+            err
+        );
+
+        return res.status(500).json(
+            apiResponse(null, {
+                code: "SERVER_ERROR",
+                message:
+                    err.message ||
+                    "Failed to send OTP",
+            })
+        );
+    }
 };
 
 const forgotPasswordVerifyOTPPost = async (req, res) => {

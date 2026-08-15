@@ -24,7 +24,7 @@ const RequestFacultySchema = new Schema(
     phoneNumber: { type: String, required: true },
     namePrefix: { type: String },
     firstName: { type: String, required: true },
-    middleName: { type: String, required: true },
+    middleName: { type: String, required: false },
     lastName: { type: String, required: true },
     sex: {
       type: String,

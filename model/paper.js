@@ -15,15 +15,9 @@ const PaperSchema = new Schema(
       trim: true,
     },
 
-    paperType: {
-      type: String,
-      enum: ["pdf", "link"],
-      required: true,
-    },
-
     paperUrl: {
       type: String,
-      required: true,
+      required: false,
     },
   },
   { timestamps: true }

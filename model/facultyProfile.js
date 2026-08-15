@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
-const Schema = mongoose.Schema;
+
+const { Schema } = mongoose;
 
 const FacultyProfileSchema = new Schema(
   {
@@ -8,10 +9,36 @@ const FacultyProfileSchema = new Schema(
       ref: "Account",
       required: true,
       unique: true,
+      index: true,
     },
-    photoId: { type: String, required: true },
-    email: { type: String, required: true },
-    phoneNumber: { type: String, required: true },
+
+    // ==========================================
+    // 6-DIGIT FACULTY SECURITY CODE
+    // ==========================================
+    securityCode: {
+      type: String,
+      required: true,
+      unique: true,
+      match: /^\d{6}$/,
+    },
+
+    photoId: {
+      type: String,
+      required: true,
+    },
+
+    email: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    phoneNumber: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
     contactInfo: {
       type: [
         {
@@ -25,33 +52,76 @@ const FacultyProfileSchema = new Schema(
           },
         },
       ],
-      required: false,
+      default: [],
     },
-    namePrefix: { type: String },
-    firstName: { type: String, required: true },
-    middleName: { type: String, required: false},
-    lastName: { type: String, required: true },
+
+    namePrefix: {
+      type: String,
+      trim: true,
+    },
+
+    firstName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    middleName: {
+      type: String,
+      trim: true,
+    },
+
+    lastName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
     sex: {
       type: String,
-      enum: ["male", "female", "other", "prefer not to say"],
+      enum: [
+        "male",
+        "female",
+        "other",
+        "prefer not to say",
+      ],
       default: "prefer not to say",
     },
-    startDate: { type: Date, required: true },
+
+    startDate: {
+      type: Date,
+      required: true,
+    },
+
     departmentId: {
       type: Schema.Types.ObjectId,
       ref: "Department",
       required: true,
+      index: true,
     },
+
     hod: {
       type: Boolean,
       required: true,
+      default: false,
     },
-    bios:{
+
+    bios: {
       type: String,
-      required: false,
+      trim: true,
     },
-    highestDegree: { type: String, required: true },
-    expertFields: [{ type: String, required: true }],
+
+    highestDegree: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    expertFields: {
+      type: [String],
+      default: [],
+    },
+
     roles: {
       type: [
         {
@@ -75,10 +145,15 @@ const FacultyProfileSchema = new Schema(
           ],
         },
       ],
-      required: true,
+      default: [],
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
-module.exports = mongoose.model("FacultyProfile", FacultyProfileSchema);
+module.exports = mongoose.model(
+  "FacultyProfile",
+  FacultyProfileSchema
+);

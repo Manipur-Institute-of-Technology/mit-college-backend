@@ -48,7 +48,7 @@ router.get(
 			{
 				location: "query",
 				keys: ["status"],
-				values: ["active", "inactive", "pending", "reject", ""],
+				
 			},
 		],
 	),
@@ -123,7 +123,7 @@ router.patch(
 			{
 				location: "body",
 				keys: ["status"],
-				values: ["active", "inactive", "pending", "reject"],
+				
 			},
 		],
 	),

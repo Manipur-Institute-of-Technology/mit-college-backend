@@ -1,275 +1,464 @@
 const express = require("express");
+const mongoose = require("mongoose");
 const fs = require("fs");
 const path = require("path");
-const mongoose = require("mongoose");
 
 const Gallery = require("../model/gallery");
 const Image = require("../model/image");
 
 const {
-	ReqFieldValidator,
-	HeaderFieldValidator,
+  HeaderFieldValidator,
 } = require("../middleware/FieldValidator");
+
 const JWTAuthentication = require("../middleware/JWTAuthentication");
 const Authorization = require("../middleware/Authorization");
 
 const router = express.Router();
 
-router.post(
-	"/add",
-	HeaderFieldValidator("Authorization"),
-	JWTAuthentication,
-	Authorization(["admin"]),
-	ReqFieldValidator(
-		{
-			code: "MISSING_FORM_FIELD",
-			message: "Required fields missing",
-		},
-		[
-			{ location: "body", keys: ["galleryName"] },
-		],
-	),
-	async (req, res) => {
-		try {
-			const { galleryName, is_normal_gallery = true } = req.body;
+// =====================================================
+// CONSTANT
+// =====================================================
 
-			if (galleryName.includes("..") || galleryName.includes("/")) {
-				return res.status(400).json({
-					message: "Invalid gallery name",
-				});
-			}
-
-			const folderPath = path.join(
-				process.cwd(),
-				"uploads",
-				"gallery",
-				galleryName
-			);
-
-			if (!fs.existsSync(folderPath)) {
-				fs.mkdirSync(folderPath, { recursive: true });
-			}
-
-			const gallery = await Gallery.create({
-				galleryName,
-				is_normal_gallery,
-			});
-
-			res.status(201).json({
-				success: true,
-				data: gallery,
-			});
-		} catch (err) {
-			if (err.code === 11000) {
-				return res.status(400).json({
-					message: "Gallery already exists",
-				});
-			}
-			res.status(500).json({ message: err.message });
-		}
-	}
+const GALLERY_ROOT = path.join(
+  process.cwd(),
+  "uploads",
+  "gallery"
 );
 
-router.get(
-	"/",
-	async (req, res) => {
-		try {
-			const galleries = await Gallery.find().lean();
-			const galleryIds = galleries.map((g) => g._id);
+// =====================================================
+// CREATE PHYSICAL GALLERY FOLDER
+// =====================================================
 
-			const images = await Image.find({
-				gallery: { $in: galleryIds },
-			}).lean();
+const createGalleryFolder = (galleryName) => {
+  const folderPath = path.join(
+    GALLERY_ROOT,
+    galleryName
+  );
 
-			const imageMap = {};
-			galleries.forEach((g) => (imageMap[g._id] = []));
+  if (!fs.existsSync(folderPath)) {
+    fs.mkdirSync(folderPath, {
+      recursive: true,
+    });
+  }
 
-			images.forEach((img) => {
-				imageMap[img.gallery].push(img);
-			});
+  return folderPath;
+};
 
-			const result = galleries.map((g) => ({
-				...g,
-				images: imageMap[g._id],
-			}));
+// =====================================================
+// GET ALL GALLERIES
+// GET /mit/gallery
+// =====================================================
 
-			res.json({
-				success: true,
-				data: result,
-			});
-		} catch (err) {
-			res.status(500).json({ message: err.message });
-		}
-	}
-);
+router.get("/", async (req, res) => {
+  try {
+    const galleries = await Gallery.find({})
+      .sort({
+        createdAt: -1,
+      })
+      .lean();
 
-router.get(
-	"/:name",
-	async (req, res) => {
-		try {
-			const gallery = await Gallery.findOne({
-				galleryName: req.params.name,
-			});
+    const result = await Promise.all(
+      galleries.map(async (gallery) => {
+        const images = await Image.find({
+          gallery: gallery._id,
+        })
+          .sort({
+            createdAt: -1,
+          })
+          .lean();
 
-			if (!gallery) {
-				return res.status(404).json({
-					message: "Gallery not found",
-				});
-			}
+        return {
+          ...gallery,
+          images,
+        };
+      })
+    );
 
-			const images = await Image.find({
-				gallery: gallery._id,
-			});
+    return res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error(
+      "GET GALLERIES ERROR:",
+      error
+    );
 
-			res.json({
-				success: true,
-				data: images,
-			});
-		} catch (err) {
-			res.status(500).json({ message: err.message });
-		}
-	}
-);
+    return res.status(500).json({
+      success: false,
+      message:
+        error.message ||
+        "Failed to fetch galleries",
+    });
+  }
+});
+
+// =====================================================
+// CREATE GALLERY
+// POST /mit/gallery/add
+// =====================================================
 
 router.post(
-	"/edit/:id",
-	HeaderFieldValidator("Authorization"),
-	JWTAuthentication,
-	Authorization(["admin"]),
-	ReqFieldValidator(
-		{
-			code: "INVALID_OBJECT_ID",
-			message: "Invalid gallery id",
-		},
-		[
-			{
-				location: "params",
-				keys: ["id"],
-				validatorCb: (val) =>
-					mongoose.Types.ObjectId.isValid(val),
-			},
-		],
-	),
-	async (req, res) => {
-		try {
-			const { galleryName, is_normal_gallery } = req.body;
+  "/add",
 
-			if (galleryName && (galleryName.includes("..") || galleryName.includes("/"))) {
-				return res.status(400).json({
-					message: "Invalid gallery name",
-				});
-			}
+  HeaderFieldValidator("Authorization"),
 
-			const gallery = await Gallery.findById(req.params.id);
-			if (!gallery) {
-				return res.status(404).json({
-					message: "Gallery not found",
-				});
-			}
+  JWTAuthentication,
 
-			/* ---------- Rename folder if galleryName changed ---------- */
-			if (galleryName && galleryName !== gallery.galleryName) {
-				const oldPath = path.join(
-					process.cwd(),
-					"uploads",
-					"gallery",
-					gallery.galleryName
-				);
+  Authorization(["admin"]),
 
-				const newPath = path.join(
-					process.cwd(),
-					"uploads",
-					"gallery",
-					galleryName
-				);
+  async (req, res) => {
+    try {
+      console.log(
+        "POST /mit/gallery/add"
+      );
 
-				if (fs.existsSync(newPath)) {
-					return res.status(400).json({
-						message: "Gallery folder already exists",
-					});
-				}
+      console.log(
+        "BODY:",
+        req.body
+      );
 
-				if (fs.existsSync(oldPath)) {
-					fs.renameSync(oldPath, newPath);
-				}
+      // =================================================
+      // GET VALUES
+      // =================================================
 
-				gallery.galleryName = galleryName;
-			}
+      const galleryName =
+        typeof req.body.galleryName ===
+        "string"
+          ? req.body.galleryName.trim()
+          : "";
 
-			/* ---------- Update is_normal_gallery ---------- */
-			if (typeof is_normal_gallery === "boolean") {
-				gallery.is_normal_gallery = is_normal_gallery;
-			}
+      // =================================================
+      // VALIDATE NAME
+      // =================================================
 
-			await gallery.save();
+      if (!galleryName) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Gallery name is required",
+        });
+      }
 
-			res.json({
-				success: true,
-				message: "Gallery updated successfully",
-				data: gallery,
-			});
-		} catch (err) {
-			if (err.code === 11000) {
-				return res.status(400).json({
-					message: "Gallery name already exists",
-				});
-			}
-			res.status(500).json({ message: err.message });
-		}
-	}
+      // =================================================
+      // DO NOT ALLOW CAROUSAL AS NORMAL GALLERY
+      // =================================================
+
+      if (
+        galleryName.toLowerCase() ===
+        "carousal"
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Carousal is a reserved gallery",
+        });
+      }
+
+      // =================================================
+      // NORMALIZE BOOLEAN
+      // =================================================
+
+      let isNormalGallery = true;
+
+      if (
+        req.body.is_normal_gallery !==
+        undefined
+      ) {
+        const value =
+          req.body.is_normal_gallery;
+
+        if (
+          value === false ||
+          value === "false"
+        ) {
+          isNormalGallery = false;
+        } else {
+          isNormalGallery = true;
+        }
+      }
+
+      // =================================================
+      // CHECK EXISTING GALLERY
+      // =================================================
+
+      const existingGallery =
+        await Gallery.findOne({
+          galleryName: {
+            $regex: `^${galleryName.replace(
+              /[.*+?^${}()|[\]\\]/g,
+              "\\$&"
+            )}$`,
+            $options: "i",
+          },
+        });
+
+      if (existingGallery) {
+        return res.status(409).json({
+          success: false,
+          message:
+            `Gallery "${existingGallery.galleryName}" already exists`,
+        });
+      }
+
+      // =================================================
+      // CREATE DATABASE RECORD
+      // =================================================
+
+      let gallery;
+
+      try {
+        gallery =
+          await Gallery.create({
+            galleryName,
+            is_normal_gallery:
+              isNormalGallery,
+          });
+      } catch (error) {
+        if (error.code === 11000) {
+          return res.status(409).json({
+            success: false,
+            message:
+              `Gallery "${galleryName}" already exists`,
+          });
+        }
+
+        throw error;
+      }
+
+      // =================================================
+      // CREATE PHYSICAL FOLDER
+      // =================================================
+
+      try {
+        createGalleryFolder(
+          galleryName
+        );
+      } catch (folderError) {
+        console.error(
+          "FOLDER CREATION ERROR:",
+          folderError
+        );
+
+        await Gallery.findByIdAndDelete(
+          gallery._id
+        );
+
+        return res.status(500).json({
+          success: false,
+          message:
+            "Gallery folder could not be created",
+        });
+      }
+
+      // =================================================
+      // SUCCESS
+      // =================================================
+
+      return res.status(201).json({
+        success: true,
+
+        message:
+          "Gallery created successfully",
+
+        data: {
+          _id: gallery._id,
+
+          galleryName:
+            gallery.galleryName,
+
+          is_normal_gallery:
+            gallery.is_normal_gallery,
+
+          folder:
+            `uploads/gallery/${galleryName}`,
+        },
+      });
+    } catch (error) {
+      console.error(
+        "CREATE GALLERY ERROR:",
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        message:
+          error.message ||
+          "Failed to create gallery",
+      });
+    }
+  }
 );
+
+// =====================================================
+// DELETE GALLERY
+// DELETE /mit/gallery/delete/:id
+// =====================================================
 
 router.delete(
-	"/delete/:id",
-	HeaderFieldValidator("Authorization"),
-	JWTAuthentication,
-	Authorization(["admin"]),
-	ReqFieldValidator(
-		{
-			code: "INVALID_OBJECT_ID",
-			message: "Invalid gallery id",
-		},
-		[
-			{
-				location: "params",
-				keys: ["id"],
-				validatorCb: (val) =>
-					mongoose.Types.ObjectId.isValid(val),
-			},
-		],
-	),
-	async (req, res) => {
-		try {
-			const gallery = await Gallery.findById(req.params.id);
-			if (!gallery) {
-				return res.status(404).json({
-					message: "Gallery not found",
-				});
-			}
+  "/delete/:id",
 
-			await Image.deleteMany({ gallery: gallery._id });
+  HeaderFieldValidator("Authorization"),
 
-			const folderPath = path.join(
-				process.cwd(),
-				"uploads",
-				"gallery",
-				gallery.galleryName
-			);
+  JWTAuthentication,
 
-			if (fs.existsSync(folderPath)) {
-				fs.rmSync(folderPath, { recursive: true, force: true });
-			}
+  Authorization(["admin"]),
 
-			await gallery.deleteOne();
+  async (req, res) => {
+    try {
+      const { id } = req.params;
 
-			res.json({
-				success: true,
-				message: "Gallery deleted successfully",
-			});
-		} catch (err) {
-			res.status(500).json({ message: err.message });
-		}
-	}
+      // =================================================
+      // VALIDATE ID
+      // =================================================
+
+      if (
+        !mongoose.Types.ObjectId.isValid(id)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invalid gallery ID",
+        });
+      }
+
+      // =================================================
+      // FIND GALLERY
+      // =================================================
+
+      const gallery =
+        await Gallery.findById(id);
+
+      if (!gallery) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Gallery not found",
+        });
+      }
+
+      // =================================================
+      // PROTECT CAROUSAL
+      // =================================================
+
+      if (
+        gallery.galleryName.toLowerCase() ===
+        "carousal"
+      ) {
+        return res.status(403).json({
+          success: false,
+          message:
+            "The Carousal gallery cannot be deleted",
+        });
+      }
+
+      // =================================================
+      // FIND IMAGES
+      // =================================================
+
+      const images =
+        await Image.find({
+          gallery: gallery._id,
+        });
+
+      // =================================================
+      // DELETE FILES
+      // =================================================
+
+      for (const image of images) {
+        let filePath = null;
+
+        if (image.path) {
+          filePath = image.path;
+        }
+
+        if (
+          !filePath &&
+          image.imageUrl
+        ) {
+          filePath = path.join(
+            process.cwd(),
+            image.imageUrl.replace(
+              /^\//,
+              ""
+            )
+          );
+        }
+
+        if (
+          filePath &&
+          fs.existsSync(filePath)
+        ) {
+          try {
+            fs.unlinkSync(filePath);
+          } catch (fileError) {
+            console.error(
+              "FILE DELETE ERROR:",
+              fileError
+            );
+          }
+        }
+      }
+
+      // =================================================
+      // DELETE IMAGES
+      // =================================================
+
+      await Image.deleteMany({
+        gallery: gallery._id,
+      });
+
+      // =================================================
+      // DELETE FOLDER
+      // =================================================
+
+      const galleryFolder =
+        path.join(
+          GALLERY_ROOT,
+          gallery.galleryName
+        );
+
+      if (
+        fs.existsSync(
+          galleryFolder
+        )
+      ) {
+        fs.rmSync(
+          galleryFolder,
+          {
+            recursive: true,
+            force: true,
+          }
+        );
+      }
+
+      // =================================================
+      // DELETE GALLERY
+      // =================================================
+
+      await Gallery.findByIdAndDelete(
+        gallery._id
+      );
+
+      return res.status(200).json({
+        success: true,
+        message:
+          "Gallery deleted successfully",
+      });
+    } catch (error) {
+      console.error(
+        "DELETE GALLERY ERROR:",
+        error
+      );
+
+      return res.status(500).json({
+        success: false,
+        message:
+          error.message ||
+          "Failed to delete gallery",
+      });
+    }
+  }
 );
 
 module.exports = router;

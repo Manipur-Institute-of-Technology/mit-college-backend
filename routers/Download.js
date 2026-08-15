@@ -11,22 +11,36 @@ const createUploader = require("../middleware/multer");
 
 const upload = createUploader("downloads");
 
+/*
+|--------------------------------------------------------------------------
+| GET ALL DOWNLOADS
+|--------------------------------------------------------------------------
+*/
 router.get("/", async (req, res) => {
   try {
     const downloads = await Download.find()
-      .sort({ createdAt: -1 });
+      .sort({
+        createdAt: -1,
+      });
 
     res.status(200).json({
       total: downloads.length,
       data: downloads,
     });
   } catch (error) {
+    console.error("Fetch downloads:", error);
+
     res.status(500).json({
       error: "Failed to fetch downloads",
     });
   }
 });
 
+/*
+|--------------------------------------------------------------------------
+| ADD DOWNLOAD
+|--------------------------------------------------------------------------
+*/
 router.post(
   "/add",
   jwtAuth,
@@ -35,16 +49,21 @@ router.post(
   async (req, res) => {
     try {
       if (!req.file) {
-        return res.status(400).json({ error: "File is required" });
+        return res.status(400).json({
+          error: "File is required",
+        });
       }
 
       const { title } = req.body;
-      if (!title) {
-        return res.status(400).json({ error: "Title is required" });
+
+      if (!title || !title.trim()) {
+        return res.status(400).json({
+          error: "Title is required",
+        });
       }
 
       const download = new Download({
-        title,
+        title: title.trim(),
         fileName: req.file.filename,
         submittedBy: req.account._id,
       });
@@ -56,6 +75,8 @@ router.post(
         data: download,
       });
     } catch (error) {
+      console.error("Add download:", error);
+
       res.status(500).json({
         error: "Failed to upload download",
       });
@@ -63,6 +84,11 @@ router.post(
   }
 );
 
+/*
+|--------------------------------------------------------------------------
+| DELETE DOWNLOAD
+|--------------------------------------------------------------------------
+*/
 router.delete(
   "/delete/:id",
   jwtAuth,
@@ -72,12 +98,17 @@ router.delete(
       const { id } = req.params;
 
       if (!mongoose.Types.ObjectId.isValid(id)) {
-        return res.status(400).json({ error: "Invalid download ID" });
+        return res.status(400).json({
+          error: "Invalid download ID",
+        });
       }
 
       const download = await Download.findById(id);
+
       if (!download) {
-        return res.status(404).json({ error: "Download not found" });
+        return res.status(404).json({
+          error: "Download not found",
+        });
       }
 
       const filePath = path.join(
@@ -98,6 +129,8 @@ router.delete(
         message: "Download deleted successfully",
       });
     } catch (error) {
+      console.error("Delete download:", error);
+
       res.status(500).json({
         error: "Failed to delete download",
       });

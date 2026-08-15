@@ -4,6 +4,8 @@ const apiResponse = require("../utils/apiResponse");
 const Account = require("../model/account")
 const RequestFaculty = require("../model/requestFaculty")
 const FacultyProfile = require("../model/facultyProfile")
+const Department = require("../model/department");
+const createUploader = require("../middleware/multer");
 
 const {
 	ReqFieldValidator,
@@ -30,28 +32,115 @@ const { passwordValidator } = require("../utils/passwordValidator");
 const router = new express.Router();
 
 router.post(
-	"/login",
-	ReqFieldValidator(
-		{
-			code: "MISSING_AUTHENTICATION_INFO",
-			message: "credential required",
-		},
-		[
-			{
-				location: "body",
-				keys: ["email"],
-				validatorCb: (val) => validator.isEmail(val),
-			},
-			{
-				location: "body",
-				keys: ["password"],
-				validatorCb: (val) => passwordValidator(val),
-			},
-			{ location: "body", keys: ["accountType"], values: ["faculty", "admin"] },
-		],
-	),
-	// ValidateLoginField,
-	loginPostHandler,
+  "/login",
+  async (req, res, next) => {
+    try {
+      const {
+        email,
+        password,
+        securityCode,
+        accountType,
+      } = req.body;
+
+      // -----------------------------------------
+      // Email
+      // -----------------------------------------
+
+      if (!email || !validator.isEmail(email)) {
+        return res.status(400).json(
+          apiResponse(null, {
+            code: "INVALID_EMAIL",
+            message: "Valid email is required",
+          })
+        );
+      }
+
+      // -----------------------------------------
+      // Account type
+      // -----------------------------------------
+
+      if (
+        !["faculty", "admin"].includes(accountType)
+      ) {
+        return res.status(400).json(
+          apiResponse(null, {
+            code: "INVALID_ACCOUNT_TYPE",
+            message: "Invalid account type",
+          })
+        );
+      }
+
+      // -----------------------------------------
+      // Admin MUST use password
+      // -----------------------------------------
+
+      if (accountType === "admin") {
+        if (
+          !password ||
+          !passwordValidator(password)
+        ) {
+          return res.status(400).json(
+            apiResponse(null, {
+              code: "INVALID_PASSWORD",
+              message: "Valid password is required",
+            })
+          );
+        }
+      }
+
+      // -----------------------------------------
+      // Faculty
+      // -----------------------------------------
+
+      if (accountType === "faculty") {
+        const hasPassword =
+          typeof password === "string" &&
+          password.length > 0;
+
+        const hasSecurityCode =
+          typeof securityCode === "string" &&
+          /^\d{6}$/.test(securityCode);
+
+        if (!hasPassword && !hasSecurityCode) {
+          return res.status(400).json(
+            apiResponse(null, {
+              code: "MISSING_LOGIN_CREDENTIAL",
+              message:
+                "Faculty password or 6-digit security code is required",
+            })
+          );
+        }
+
+        // Don't allow both
+        if (hasPassword && hasSecurityCode) {
+          return res.status(400).json(
+            apiResponse(null, {
+              code: "INVALID_LOGIN_CREDENTIAL",
+              message:
+                "Use either password or security code",
+            })
+          );
+        }
+
+        if (
+          hasPassword &&
+          !passwordValidator(password)
+        ) {
+          return res.status(400).json(
+            apiResponse(null, {
+              code: "INVALID_PASSWORD",
+              message: "Invalid password",
+            })
+          );
+        }
+      }
+
+      next();
+    } catch (error) {
+      next(error);
+    }
+  },
+  loginPostHandler
 );
 
 router.post(
@@ -224,27 +313,30 @@ router.post(
 );
 
 // TODO: Implement controller
-router.get(
-	"/forgotpassword",
-	ReqFieldValidator(
-		{
-			code: "MISSING_REQ_FIELD",
-			message: "invalid req field",
-		},
-		[
-			{
-				location: "body",
-				keys: ["email"],
-				validatorCb: (val) => validator.isEmail(val),
-			},
-			{
-				location: "body",
-				keys: ["accountType"],
-				values: ["admin", "faculty"],
-			},
-		],
-	),
-	forgotPasswordGet,
+router.post(
+  "/forgotpassword",
+  ReqFieldValidator(
+    {
+      code: "MISSING_REQ_FIELD",
+      message: "invalid req field",
+    },
+    [
+      {
+        location: "body",
+        keys: ["email"],
+        validatorCb: (val) =>
+          typeof val === "string" && validator.isEmail(val),
+        error: "Valid email is required",
+      },
+      {
+        location: "body",
+        keys: ["accountType"],
+        values: ["admin", "faculty"],
+        error: "Account type must be admin or faculty",
+      },
+    ],
+  ),
+  forgotPasswordGet,
 );
 
 router.post(
@@ -271,7 +363,7 @@ router.post(
 
 router.post(
 	"/forgotpassword/permtoken",
-	Authorization(["faculty"], ["active"]),
+	Authorization(["faculty"]),
 	ReqFieldValidator(
 		{
 			code: "MISSING_REQ_FIELD",
@@ -345,35 +437,133 @@ router.post(
 	changePasswordPost,
 );
 
-router.post("/requestfaculty", async (req, res) => {
-  try {
-    const exists = await RequestFaculty.findOne({ email: req.body.email });
-    if (exists) {
-      return res.status(400).json(
+const facultyPhotoUpload = createUploader("faculty");
+
+router.post(
+  "/requestfaculty",
+  facultyPhotoUpload.single("photo"),
+  async (req, res) => {
+    try {
+      const {
+        email,
+        departmentName,
+        ...facultyData
+      } = req.body;
+
+      // -----------------------------------------
+      // Check photo
+      // -----------------------------------------
+
+      if (!req.file) {
+        return res.status(400).json(
+          apiResponse(null, {
+            code: "PHOTO_REQUIRED",
+            message: "Profile photo is required",
+          })
+        );
+      }
+
+      // -----------------------------------------
+      // Check email
+      // -----------------------------------------
+
+      if (!email) {
+        return res.status(400).json(
+          apiResponse(null, {
+            code: "EMAIL_REQUIRED",
+            message: "Email is required",
+          })
+        );
+      }
+
+      const normalizedEmail = email.trim().toLowerCase();
+
+      // -----------------------------------------
+      // Check existing request
+      // -----------------------------------------
+
+      const exists = await RequestFaculty.findOne({
+        email: normalizedEmail,
+      });
+
+      if (exists) {
+        return res.status(400).json(
+          apiResponse(null, {
+            code: "REQUEST_ALREADY_EXISTS",
+            message: "Faculty request already submitted",
+          })
+        );
+      }
+
+      // -----------------------------------------
+      // Check department
+      // -----------------------------------------
+
+      if (!departmentName) {
+        return res.status(400).json(
+          apiResponse(null, {
+            code: "INVALID_DEPARTMENT",
+            message: "Department is required",
+          })
+        );
+      }
+
+      const department = await Department.findOne({
+        name: departmentName.trim().toLowerCase(),
+      });
+
+      if (!department) {
+        return res.status(400).json(
+          apiResponse(null, {
+            code: "INVALID_DEPARTMENT",
+            message: "Selected department does not exist",
+          })
+        );
+      }
+
+      // -----------------------------------------
+      // Create request
+      // -----------------------------------------
+
+      const request = new RequestFaculty({
+        ...facultyData,
+
+        email: normalizedEmail,
+
+        // Backend resolves MongoDB department ID
+        departmentId: department._id,
+
+        // Store uploaded filename
+        photoId: req.file.filename,
+      });
+
+      await request.save();
+
+      // -----------------------------------------
+      // Success
+      // -----------------------------------------
+
+      return res.status(201).json(
+        apiResponse({
+          message: "Faculty request submitted successfully",
+
+          requestId: request._id,
+
+          photoId: request.photoId,
+        })
+      );
+    } catch (err) {
+      console.error("REQUEST FACULTY ERROR:", err);
+
+      return res.status(500).json(
         apiResponse(null, {
-          code: "REQUEST_ALREADY_EXISTS",
-          message: "Faculty request already submitted",
+          code: "REQUEST_FACULTY_ERROR",
+          message: err.message || err.toString(),
         })
       );
     }
-
-    const request = new RequestFaculty(req.body);
-    await request.save();
-
-    res.status(201).json(
-      apiResponse({
-        message: "Faculty request submitted successfully",
-      })
-    );
-  } catch (err) {
-    res.status(500).json(
-      apiResponse(null, {
-        code: "REQUEST_FACULTY_ERROR",
-        message: err.toString(),
-      })
-    );
   }
-});
+);
 
 router.get(
   "/requestfaculty",
@@ -402,6 +592,10 @@ router.get(
   }
 );
 
+const generateSecurityCode = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
 router.post(
   "/requestfaculty/accept/:id",
   JWTAuthentication,
@@ -409,17 +603,38 @@ router.post(
   async (req, res) => {
     try {
       const request = await RequestFaculty.findById(req.params.id);
+
       if (!request) {
-        return res.status(404).json({ error: "Request not found" });
+        return res.status(404).json({
+          error: "Request not found",
+        });
       }
+
+      // Generate unique 6-digit security code
+      let securityCode;
+      let existingCode;
+
+      do {
+        securityCode = generateSecurityCode();
+
+        existingCode = await FacultyProfile.findOne({
+          securityCode,
+        });
+      } while (existingCode);
+
+      // Create faculty account
       const account = new Account({
         email: request.email,
         username: request.username,
         password: request.password,
         accountType: "faculty",
       });
+
       account._passwordAlreadyHashed = true;
+
       await account.save();
+
+      // Create faculty profile
       await FacultyProfile.create({
         accountId: account._id,
         email: request.email,
@@ -438,17 +653,26 @@ router.post(
         roles: request.roles,
         bios: request.bios,
         contactInfo: [],
+
+        // 6-digit login/security code
+        securityCode,
       });
 
+      // Delete pending request
       await request.deleteOne();
 
       res.json({
         success: true,
         message: "Faculty approved successfully",
+        securityCode,
       });
+
     } catch (err) {
       console.error("ACCEPT FACULTY ERROR:", err);
-      res.status(500).json({ error: err.message });
+
+      res.status(500).json({
+        error: err.message,
+      });
     }
   }
 );

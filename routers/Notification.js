@@ -11,125 +11,216 @@ const createUploader = require("../middleware/multer");
 
 const upload = createUploader("notifications");
 
-router.get("/all", async (req, res) => {
-	try {
-		const notifications = await Notif.find().sort({ createdAt: -1 });
-		res.status(200).json(notifications);
-	} catch (error) {
-		res.status(500).json({
-			error: "Failed to fetch notifications",
-		});
-	}
-});
-
+/*
+|--------------------------------------------------------------------------
+| GET ACTIVE NOTIFICATIONS
+|--------------------------------------------------------------------------
+| Only notifications whose active_date is in the future.
+*/
 router.get("/", async (req, res) => {
-	try {
-		const now = new Date();
+  try {
+    const now = new Date();
 
-		const notifications = await Notif.find({
-			active_date: { $gte: now },
-		}).sort({ createdAt: -1 });
+    const notifications = await Notif.find({
+      active_date: {
+        $gte: now,
+      },
+    }).sort({
+      active_date: 1,
+      createdAt: -1,
+    });
 
-		res.status(200).json(notifications);
-	} catch (error) {
-		res.status(500).json({
-			error: "Failed to fetch active notifications",
-		});
-	}
+    res.status(200).json({
+      total: notifications.length,
+      data: notifications,
+    });
+  } catch (error) {
+    console.error("Fetch active notifications:", error);
+
+    res.status(500).json({
+      error: "Failed to fetch active notifications",
+    });
+  }
 });
 
+/*
+|--------------------------------------------------------------------------
+| GET INACTIVE / EXPIRED NOTIFICATIONS
+|--------------------------------------------------------------------------
+| Notifications whose active_date has already passed.
+*/
+router.get("/inactive", async (req, res) => {
+  try {
+    const now = new Date();
+
+    const notifications = await Notif.find({
+      active_date: {
+        $lt: now,
+      },
+    }).sort({
+      active_date: -1,
+      createdAt: -1,
+    });
+
+    res.status(200).json({
+      total: notifications.length,
+      data: notifications,
+    });
+  } catch (error) {
+    console.error("Fetch inactive notifications:", error);
+
+    res.status(500).json({
+      error: "Failed to fetch inactive notifications",
+    });
+  }
+});
+
+/*
+|--------------------------------------------------------------------------
+| GET ALL NOTIFICATIONS
+|--------------------------------------------------------------------------
+*/
+router.get("/all", async (req, res) => {
+  try {
+    const notifications = await Notif.find()
+      .sort({
+        active_date: -1,
+        createdAt: -1,
+      });
+
+    res.status(200).json({
+      total: notifications.length,
+      data: notifications,
+    });
+  } catch (error) {
+    console.error("Fetch all notifications:", error);
+
+    res.status(500).json({
+      error: "Failed to fetch notifications",
+    });
+  }
+});
+
+/*
+|--------------------------------------------------------------------------
+| ADD NOTIFICATION
+|--------------------------------------------------------------------------
+*/
 router.post(
-	"/add",
-	jwtAuth,
-	Authorization(["admin"]),
-	upload.single("file"),
-	async (req, res) => {
-		try {
-			if (!req.file) {
-				return res.status(400).json({
-					error: "File is required",
-				});
-			}
+  "/add",
+  jwtAuth,
+  Authorization(["admin"]),
+  upload.single("file"),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({
+          error: "File is required",
+        });
+      }
 
-			const { title, type, active_date } = req.body;
+      const {
+        title,
+        type,
+        active_date,
+      } = req.body;
 
-			if (!title) {
-				return res.status(400).json({
-					error: "Title is required",
-				});
-			}
+      if (!title || !title.trim()) {
+        return res.status(400).json({
+          error: "Title is required",
+        });
+      }
 
-			if (!active_date) {
-				return res.status(400).json({
-					error: "active_date is required",
-				});
-			}
+      if (!active_date) {
+        return res.status(400).json({
+          error: "Active date is required",
+        });
+      }
 
-			const notification = new Notif({
-				fileName: req.file.filename,
-				title,
-				type,
-				active_date: new Date(active_date),
-				submittedBy: req.account._id,
-			});
+      const parsedDate = new Date(active_date);
 
-			await notification.save();
+      if (Number.isNaN(parsedDate.getTime())) {
+        return res.status(400).json({
+          error: "Invalid active date",
+        });
+      }
 
-			res.status(201).json({
-				message: "Notification created successfully",
-				data: notification,
-			});
-		} catch (error) {
-			res.status(500).json({
-				error: "Failed to create notification",
-			});
-		}
-	}
+      const notification = new Notif({
+        fileName: req.file.filename,
+        title: title.trim(),
+        type: type || "miscellaneous",
+        active_date: parsedDate,
+        submittedBy: req.account._id,
+      });
+
+      await notification.save();
+
+      res.status(201).json({
+        message: "Notification created successfully",
+        data: notification,
+      });
+    } catch (error) {
+      console.error("Create notification:", error);
+
+      res.status(500).json({
+        error: "Failed to create notification",
+      });
+    }
+  }
 );
 
+/*
+|--------------------------------------------------------------------------
+| DELETE NOTIFICATION
+|--------------------------------------------------------------------------
+*/
 router.delete(
-	"/delete/:id",
-	jwtAuth,
-	Authorization(["admin"]),
-	async (req, res) => {
-		try {
-			if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-				return res.status(400).json({
-					error: "Invalid notification ID",
-				});
-			}
+  "/delete/:id",
+  jwtAuth,
+  Authorization(["admin"]),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
 
-			const notification = await Notif.findById(req.params.id);
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({
+          error: "Invalid notification ID",
+        });
+      }
 
-			if (!notification) {
-				return res.status(404).json({
-					error: "Notification not found",
-				});
-			}
+      const notification = await Notif.findById(id);
 
-			const filePath = path.join(
-				__dirname,
-				"..",
-				"uploads",
-				"notifications",
-				notification.fileName
-			);
+      if (!notification) {
+        return res.status(404).json({
+          error: "Notification not found",
+        });
+      }
 
-			if (fs.existsSync(filePath)) {
-				fs.unlinkSync(filePath);
-			}
+      const filePath = path.join(
+        __dirname,
+        "..",
+        "uploads",
+        "notifications",
+        notification.fileName
+      );
 
-			await notification.deleteOne();
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
 
-			res.status(200).json({
-				message: "Notification deleted successfully",
-			});
-		} catch (error) {
-			res.status(500).json({
-				error: "Failed to delete notification",
-			});
-		}
-	}
+      await notification.deleteOne();
+
+      res.status(200).json({
+        message: "Notification deleted successfully",
+      });
+    } catch (error) {
+      console.error("Delete notification:", error);
+
+      res.status(500).json({
+        error: "Failed to delete notification",
+      });
+    }
+  }
 );
 
 module.exports = router;
