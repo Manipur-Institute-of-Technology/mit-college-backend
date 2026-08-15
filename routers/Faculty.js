@@ -181,36 +181,36 @@ router.get("/department/:department", async (req, res) => {
 // This uses FacultyProfile._id
 // ======================================================
 
-router.get("/profile/:facultyId", async (req, res) => {
+router.get("/:accountId", async (req, res) => {
   try {
-    const facultyId = req.params.facultyId;
+    const { accountId } = req.params;
 
     console.log("================================");
     console.log("FACULTY PROFILE API HIT");
-    console.log("Faculty ID:", facultyId);
+    console.log("Account ID:", accountId);
     console.log("================================");
 
     // --------------------------------------------------
     // VALIDATE OBJECT ID
     // --------------------------------------------------
 
-    if (!mongoose.Types.ObjectId.isValid(facultyId)) {
+    if (!mongoose.Types.ObjectId.isValid(accountId)) {
       return res.status(400).json(
         apiResponse(null, {
-          code: "INVALID_FACULTY_ID",
-          message: "Invalid faculty ID",
+          code: "INVALID_ACCOUNT_ID",
+          message: "Invalid account ID",
         })
       );
     }
 
     // --------------------------------------------------
-    // FIND FACULTY
+    // FIND FACULTY USING accountId
     // --------------------------------------------------
 
     const faculty = await FacultyProfile.aggregate([
       {
         $match: {
-          _id: new mongoose.Types.ObjectId(facultyId),
+          accountId: new mongoose.Types.ObjectId(accountId),
         },
       },
 
@@ -240,6 +240,10 @@ router.get("/profile/:facultyId", async (req, res) => {
         },
       },
 
+      // ------------------------------------------------
+      // UNWIND DEPARTMENT
+      // ------------------------------------------------
+
       {
         $unwind: {
           path: "$department",
@@ -248,35 +252,50 @@ router.get("/profile/:facultyId", async (req, res) => {
       },
 
       // ------------------------------------------------
-      // KEEP DEPARTMENT OBJECT
+      // PROJECT
       // ------------------------------------------------
 
       {
         $project: {
           _id: 1,
+
+          // Account reference
           accountId: 1,
 
-          firstName: 1,
-          lastName: 1,
+          // Name
           namePrefix: 1,
+          firstName: 1,
+          middleName: 1,
+          lastName: 1,
 
-          roles: 1,
-
-          contactInfo: 1,
+          // Contact
+          email: 1,
           phoneNumber: 1,
+          contactInfo: 1,
 
+          // Personal
+          sex: 1,
+          startDate: 1,
+
+          // Faculty
+          roles: 1,
+          hod: 1,
           highestDegree: 1,
           expertFields: 1,
+          bios: 1,
 
+          // Photo
           photoId: 1,
           photo: 1,
 
+          // Department
           departmentId: 1,
-
           department: 1,
 
+          // Papers
           papers: 1,
 
+          // Dates
           createdAt: 1,
           updatedAt: 1,
         },
@@ -288,20 +307,29 @@ router.get("/profile/:facultyId", async (req, res) => {
       JSON.stringify(faculty, null, 2)
     );
 
+    // --------------------------------------------------
+    // FACULTY NOT FOUND
+    // --------------------------------------------------
+
     if (!faculty.length) {
       return res.status(404).json(
         apiResponse(null, {
           code: "FACULTY_NOT_FOUND",
-          message: "Faculty profile not found",
+          message: "Faculty profile not found for this account",
         })
       );
     }
+
+    // --------------------------------------------------
+    // SUCCESS
+    // --------------------------------------------------
 
     return res.status(200).json(
       apiResponse({
         faculty: faculty[0],
       })
     );
+
   } catch (err) {
     console.error(
       "FETCH FACULTY PROFILE FAILED:",
@@ -311,7 +339,9 @@ router.get("/profile/:facultyId", async (req, res) => {
     return res.status(500).json(
       apiResponse(null, {
         code: "FETCH_FACULTY_PROFILE_FAILED",
-        message: err.message,
+        message:
+          err.message ||
+          "Unable to fetch faculty profile",
       })
     );
   }

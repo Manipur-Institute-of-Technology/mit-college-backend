@@ -78,16 +78,26 @@ const AccountSchema = new Schema(
 );
 
 AccountSchema.pre("save", async function (next) {
-	if (this.isModified("password")) {
-		const hashPassword = await bcrypt.hash(this.password, +process.env.SALT);
-		if (process.env.ENV === "dev")
+	if (
+		this.isModified("password") &&
+		!this._passwordAlreadyHashed
+	) {
+		const hashPassword = await bcrypt.hash(
+			this.password,
+			+process.env.SALT
+		);
+
+		if (process.env.ENV === "dev") {
 			console.log(
 				"password before and after hash: ",
 				this.password,
-				hashPassword,
+				hashPassword
 			);
+		}
+
 		this.password = hashPassword;
 	}
+
 	next();
 });
 
