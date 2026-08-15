@@ -300,7 +300,7 @@ router.delete(
       console.log("================================");
 
       // --------------------------------------------------
-      // VALIDATE ACCOUNT ID
+      // 1. VALIDATE ACCOUNT ID
       // --------------------------------------------------
 
       if (!mongoose.Types.ObjectId.isValid(accountId)) {
@@ -311,76 +311,84 @@ router.delete(
       }
 
       // --------------------------------------------------
-      // FIND FACULTY USING ACCOUNT ID
+      // 2. FIND ACCOUNT
       // --------------------------------------------------
 
-      const faculty =
-        await FacultyProfile.findOne({
-          accountId: new mongoose.Types.ObjectId(accountId),
-        });
+      const account = await Account.findById(accountId);
 
-      if (!faculty) {
+      if (!account) {
         return res.status(404).json({
           success: false,
-          message:
-            "Faculty profile not found for this account",
+          message: "Account not found",
+        });
+      }
+
+      // Make sure this account is actually a faculty account
+      if (account.accountType !== "faculty") {
+        return res.status(400).json({
+          success: false,
+          message: "The specified account is not a faculty account",
         });
       }
 
       // --------------------------------------------------
-      // DELETE PAPERS
+      // 3. FIND FACULTY PROFILE
       // --------------------------------------------------
 
-      const result =
-        await Paper.deleteMany({
-          facultyId: faculty._id,
+      const faculty = await FacultyProfile.findOne({
+        accountId: new mongoose.Types.ObjectId(accountId),
+      });
+
+      if (!faculty) {
+        return res.status(404).json({
+          success: false,
+          message: "Faculty profile not found for this account",
         });
+      }
 
       // --------------------------------------------------
-      // DELETE FACULTY PROFILE
+      // 4. DELETE ALL PAPERS
       // --------------------------------------------------
 
-      await FacultyProfile.findByIdAndDelete(
-        faculty._id
-      );
+      const paperResult = await Paper.deleteMany({
+        facultyId: faculty._id,
+      });
 
       // --------------------------------------------------
-      // OPTIONAL:
-      // DELETE ACCOUNT
+      // 5. DELETE FACULTY PROFILE
       // --------------------------------------------------
 
-      // If you also want to delete the login account,
-      // import your Account model and uncomment:
-      //
-      // await Account.findByIdAndDelete(accountId);
+      await FacultyProfile.findByIdAndDelete(faculty._id);
 
       // --------------------------------------------------
-      // RESPONSE
+      // 6. DELETE ACCOUNT
+      // --------------------------------------------------
+
+      await Account.findByIdAndDelete(accountId);
+
+      // --------------------------------------------------
+      // 7. SUCCESS RESPONSE
       // --------------------------------------------------
 
       return res.status(200).json({
         success: true,
         message:
-          "Faculty and associated papers deleted successfully",
+          "Faculty account, profile, and associated papers deleted successfully",
 
         data: {
+          accountId: account._id,
           facultyId: faculty._id,
-          accountId: faculty.accountId,
-          papersDeleted: result.deletedCount,
+          papersDeleted: paperResult.deletedCount,
         },
       });
-
     } catch (error) {
-      console.error(
-        "❌ DELETE FACULTY ERROR:",
-        error
-      );
+      console.error("❌ DELETE FACULTY ERROR:", error);
 
       return res.status(500).json({
         success: false,
         message:
           error.message ||
-          "Unable to delete faculty",
+          "Unable to delete faculty account",
       });
     }
   }
