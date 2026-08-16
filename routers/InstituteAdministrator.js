@@ -67,10 +67,6 @@ router.get("/", async (req, res) => {
       },
     });
   } catch (error) {
-    console.error(
-      "GET ADMINISTRATION ERROR:",
-      error
-    );
 
     return res.status(500).json({
       error: error.message,
@@ -114,10 +110,6 @@ router.post(
         data,
       });
     } catch (error) {
-      console.error(
-        "CREATE ADMINISTRATION ERROR:",
-        error
-      );
 
       return res.status(500).json({
         error: error.message,
@@ -179,10 +171,6 @@ router.post(
         data,
       });
     } catch (error) {
-      console.error(
-        "ADD STRUCTURE ERROR:",
-        error
-      );
 
       return res.status(500).json({
         error: error.message,
@@ -249,10 +237,6 @@ router.put(
         data,
       });
     } catch (error) {
-      console.error(
-        "EDIT STRUCTURE ERROR:",
-        error
-      );
 
       return res.status(500).json({
         error: error.message,
@@ -304,10 +288,6 @@ router.delete(
         data,
       });
     } catch (error) {
-      console.error(
-        "DELETE STRUCTURE ERROR:",
-        error
-      );
 
       return res.status(500).json({
         error: error.message,
@@ -378,10 +358,6 @@ router.post(
         data,
       });
     } catch (error) {
-      console.error(
-        "ADD MEMBER ERROR:",
-        error
-      );
 
       return res.status(500).json({
         error: error.message,
@@ -457,10 +433,6 @@ router.put(
         data,
       });
     } catch (error) {
-      console.error(
-        "EDIT MEMBER ERROR:",
-        error
-      );
 
       return res.status(500).json({
         error: error.message,
@@ -512,10 +484,6 @@ router.delete(
         data,
       });
     } catch (error) {
-      console.error(
-        "DELETE MEMBER ERROR:",
-        error
-      );
 
       return res.status(500).json({
         error: error.message,
@@ -661,10 +629,6 @@ router.post(
         data,
       });
     } catch (error) {
-      console.error(
-        "ADD DOCUMENT ERROR:",
-        error
-      );
 
       // Delete uploaded file if DB save fails
       if (req.file) {
@@ -673,10 +637,6 @@ router.post(
             req.file.path
           );
         } catch (deleteError) {
-          console.error(
-            "FAILED TO DELETE UPLOADED FILE:",
-            deleteError
-          );
         }
       }
 
@@ -842,10 +802,6 @@ router.put(
         data,
       });
     } catch (error) {
-      console.error(
-        "EDIT DOCUMENT ERROR:",
-        error
-      );
 
       return res.status(500).json({
         error: error.message,
@@ -925,10 +881,6 @@ router.delete(
         data,
       });
     } catch (error) {
-      console.error(
-        "DELETE DOCUMENT ERROR:",
-        error
-      );
 
       return res.status(500).json({
         error: error.message,

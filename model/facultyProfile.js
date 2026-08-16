@@ -88,7 +88,7 @@ const FacultyProfileSchema = new Schema(
       default: "prefer not to say",
     },
 
-    startDate: {
+    dob: {
       type: Date,
       required: true,
     },

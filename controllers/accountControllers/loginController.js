@@ -92,8 +92,6 @@ const loginPostHandler = async (req, res) => {
 			throw new Error("Invalid login credentials");
 		}
 
-		console.log(account);
-
 		// =====================================================
 		// GENERATE JWT
 		// =====================================================
@@ -120,8 +118,6 @@ const loginPostHandler = async (req, res) => {
 		);
 
 	} catch (err) {
-		console.error("LOGIN ERROR:", err);
-
 		res.status(400).send(
 			apiResponse(null, {
 				code: "AUTHETICATION_FAILURE",

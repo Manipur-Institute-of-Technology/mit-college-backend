@@ -35,8 +35,6 @@ router.get("/", async (req, res) => {
       data: notifications,
     });
   } catch (error) {
-    console.error("Fetch active notifications:", error);
-
     res.status(500).json({
       error: "Failed to fetch active notifications",
     });
@@ -67,8 +65,6 @@ router.get("/inactive", async (req, res) => {
       data: notifications,
     });
   } catch (error) {
-    console.error("Fetch inactive notifications:", error);
-
     res.status(500).json({
       error: "Failed to fetch inactive notifications",
     });
@@ -93,8 +89,6 @@ router.get("/all", async (req, res) => {
       data: notifications,
     });
   } catch (error) {
-    console.error("Fetch all notifications:", error);
-
     res.status(500).json({
       error: "Failed to fetch notifications",
     });
@@ -160,8 +154,6 @@ router.post(
         data: notification,
       });
     } catch (error) {
-      console.error("Create notification:", error);
-
       res.status(500).json({
         error: "Failed to create notification",
       });
@@ -214,8 +206,6 @@ router.delete(
         message: "Notification deleted successfully",
       });
     } catch (error) {
-      console.error("Delete notification:", error);
-
       res.status(500).json({
         error: "Failed to delete notification",
       });

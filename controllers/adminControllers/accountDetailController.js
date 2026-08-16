@@ -25,7 +25,6 @@ const accountDetailGet = async (req, res) => {
 			.status(201)
 			.json(apiResponse({ accountInfo: _acc, permToken: _permToken }));
 	} catch (err) {
-		console.error(err);
 		return res.status(401).json(
 			apiResponse(null, {
 				code: "SERVER_ERROR",

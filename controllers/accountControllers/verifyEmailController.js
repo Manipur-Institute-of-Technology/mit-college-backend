@@ -10,7 +10,6 @@ const htmlMailVerifyOTPTemplate = require("../../template/mailVerifyOTPTemplate"
 
 const verifyEmailGet = async (req, res) => {
 	const { id } = res.locals.decodedToken;
-	// console.log("ID from res: ", id);
 
 	const otpTokenDuration = 30; // in minutes
 	const otpTokenStr = otpGen.generate(8, { specialChars: false });
@@ -37,14 +36,12 @@ const verifyEmailGet = async (req, res) => {
 				otpTokenDuration: `${otpTokenDuration} minutes`,
 			}),
 		);
-		if (process.env.ENV === "dev") console.log("OTP: ", otpTokenStr);
 		res.status(201).json(
 			apiResponse({
 				message: `OTP send to ${_otpToken.accountID.email} successfully`,
 			}),
 		);
 	} catch (err) {
-		console.error(err, "error in sending OTP");
 		res.status(400).json(
 			apiResponse(null, {
 				code: "OTP_SERVICE_ERROR",

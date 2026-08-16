@@ -87,14 +87,6 @@ AccountSchema.pre("save", async function (next) {
 			+process.env.SALT
 		);
 
-		if (process.env.ENV === "dev") {
-			console.log(
-				"password before and after hash: ",
-				this.password,
-				hashPassword
-			);
-		}
-
 		this.password = hashPassword;
 	}
 

@@ -31,7 +31,10 @@ const RequestFacultySchema = new Schema(
       enum: ["male", "female", "other", "prefer not to say"],
       default: "prefer not to say",
     },
-    startDate: { type: Date, required: true },
+    dob: {
+      type: Date,
+      required: true,
+    },
     departmentId: {
       type: Schema.Types.ObjectId,
       ref: "Department",

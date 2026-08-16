@@ -3,7 +3,6 @@ const account = require("../../model/account");
 const apiResponse = require("../../utils/apiResponse");
 
 const getAccountFilterGet = async (req, res) => {
-	console.log("ME");
 	// /getaccounts/filter?accountType=x&status=x
 	const { accountType, status } = req.query;
 

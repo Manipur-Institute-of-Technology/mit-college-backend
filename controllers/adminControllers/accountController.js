@@ -42,7 +42,6 @@ const accountPatch = async (req, res) => {
 		await session.abortTransaction();
 		session.endSession();
 
-		console.error(err.toString());
 		return res
 			.status(401)
 			.json(
@@ -87,7 +86,6 @@ const accountDelete = async (req, res) => {
 	} catch (err) {
 		await session.abortTransaction();
 		session.endSession();
-		console.error(err);
 
 		return res
 			.status(401)

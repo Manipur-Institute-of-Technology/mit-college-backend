@@ -138,8 +138,6 @@ router.post(
 
 	  if (fs.existsSync(oldAbsolutePath)) {
 	  	fs.renameSync(oldAbsolutePath, newAbsolutePath);
-	  } else {
-	  	console.warn("Old file not found:", oldAbsolutePath);
 	  }
 
 	  imageDoc.gallery = newGallery._id;
@@ -154,7 +152,6 @@ router.post(
         data: imageDoc,
       });
     } catch (err) {
-      console.error("EDIT IMAGE ERROR:", err);
       res.status(500).json({ message: err.message });
     }
   }
@@ -206,7 +203,6 @@ router.delete(
         message: "Image deleted successfully",
       });
     } catch (err) {
-      console.error("DELETE IMAGE ERROR:", err);
       res.status(500).json({ message: err.message });
     }
   }

@@ -7,8 +7,6 @@ const accountSearchEmailGet = async (req, res) => {
 
 	const accountList = await account.find({ email }).select("-password");
 
-	console.log(req.query);
-
 	res.status(201).json({ accountList });
 };
 

@@ -154,8 +154,6 @@ router.post(
       });
 
     } catch (error) {
-      console.error("PAPER CREATE ERROR:", error);
-
       // -----------------------------------------
       // Mongoose validation error
       // -----------------------------------------
@@ -344,11 +342,6 @@ router.put(
       });
 
     } catch (error) {
-      console.error(
-        "FACULTY PAPER UPDATE ERROR:",
-        error
-      );
-
       if (
         error instanceof
         mongoose.Error.ValidationError
@@ -448,11 +441,6 @@ router.delete(
       });
 
     } catch (error) {
-      console.error(
-        "PAPER DELETE ERROR:",
-        error
-      );
-
       return res.status(500).json({
         success: false,
         message: "Unable to delete paper",
@@ -538,11 +526,6 @@ router.post(
               : undefined,
         });
 
-      console.log(
-        "PAPER CREATED:",
-        paper
-      );
-
       // =====================================================
       // RESPONSE
       // =====================================================
@@ -553,11 +536,6 @@ router.post(
       });
 
     } catch (error) {
-      console.error(
-        "ADMIN PAPER CREATE ERROR:",
-        error
-      );
-
       if (
         error instanceof
         mongoose.Error.ValidationError

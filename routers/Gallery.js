@@ -79,10 +79,6 @@ router.get("/", async (req, res) => {
       data: result,
     });
   } catch (error) {
-    console.error(
-      "GET GALLERIES ERROR:",
-      error
-    );
 
     return res.status(500).json({
       success: false,
@@ -109,15 +105,6 @@ router.post(
 
   async (req, res) => {
     try {
-      console.log(
-        "POST /mit/gallery/add"
-      );
-
-      console.log(
-        "BODY:",
-        req.body
-      );
-
       // =================================================
       // GET VALUES
       // =================================================
@@ -235,10 +222,6 @@ router.post(
           galleryName
         );
       } catch (folderError) {
-        console.error(
-          "FOLDER CREATION ERROR:",
-          folderError
-        );
 
         await Gallery.findByIdAndDelete(
           gallery._id
@@ -275,10 +258,6 @@ router.post(
         },
       });
     } catch (error) {
-      console.error(
-        "CREATE GALLERY ERROR:",
-        error
-      );
 
       return res.status(500).json({
         success: false,
@@ -392,10 +371,6 @@ router.delete(
           try {
             fs.unlinkSync(filePath);
           } catch (fileError) {
-            console.error(
-              "FILE DELETE ERROR:",
-              fileError
-            );
           }
         }
       }
@@ -446,10 +421,6 @@ router.delete(
           "Gallery deleted successfully",
       });
     } catch (error) {
-      console.error(
-        "DELETE GALLERY ERROR:",
-        error
-      );
 
       return res.status(500).json({
         success: false,

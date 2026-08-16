@@ -50,10 +50,6 @@ const ensureCarouselGallery = async () => {
       recursive: true,
     });
 
-    console.log(
-      "Created carousel folder:",
-      directory
-    );
   }
 
   // Find gallery
@@ -69,10 +65,6 @@ const ensureCarouselGallery = async () => {
       is_normal_gallery: false,
     });
 
-    console.log(
-      "Created carousel gallery:",
-      gallery._id
-    );
   }
 
   return gallery;
@@ -115,10 +107,6 @@ router.get(
         data: images,
       });
     } catch (error) {
-      console.error(
-        "GET CAROUSEL ERROR:",
-        error
-      );
 
       return res.status(500).json({
         success: false,
@@ -152,30 +140,6 @@ router.post(
   Authorization(["admin"]),
 
   async (req, res) => {
-    console.log(
-      "\n===================================="
-    );
-
-    console.log(
-      "CAROUSEL UPLOAD REQUEST"
-    );
-
-    console.log(
-      "Authorization:",
-      req.headers.authorization
-        ? "PRESENT"
-        : "MISSING"
-    );
-
-    console.log(
-      "Content-Type:",
-      req.headers["content-type"]
-    );
-
-    console.log(
-      "====================================\n"
-    );
-
     try {
       // =================================================
       // ENSURE GALLERY
@@ -202,19 +166,6 @@ router.post(
           // =============================================
 
           if (err) {
-            console.error(
-              "===================================="
-            );
-
-            console.error(
-              "MULTER ERROR:",
-              err
-            );
-
-            console.error(
-              "===================================="
-            );
-
             return res.status(400).json({
               success: false,
               code: "MULTER_ERROR",
@@ -229,15 +180,6 @@ router.post(
           // =============================================
 
           if (!req.file) {
-            console.error(
-              "CAROUSEL FILE MISSING"
-            );
-
-            console.log(
-              "BODY:",
-              req.body
-            );
-
             return res.status(400).json({
               success: false,
               code: "IMAGE_REQUIRED",
@@ -245,29 +187,6 @@ router.post(
                 "Image file is required. Make sure FormData field name is 'image'.",
             });
           }
-
-          console.log(
-            "Uploaded file:",
-            {
-              fieldname:
-                req.file.fieldname,
-
-              originalname:
-                req.file.originalname,
-
-              filename:
-                req.file.filename,
-
-              path:
-                req.file.path,
-
-              mimetype:
-                req.file.mimetype,
-
-              size:
-                req.file.size,
-            }
-          );
 
           try {
             // =========================================
@@ -315,11 +234,6 @@ router.post(
                   gallery._id,
               });
 
-            console.log(
-              "CAROUSEL IMAGE SAVED:",
-              image._id
-            );
-
             return res.status(201).json({
               success: true,
 
@@ -329,10 +243,6 @@ router.post(
               data: image,
             });
           } catch (error) {
-            console.error(
-              "SAVE CAROUSEL IMAGE ERROR:",
-              error
-            );
 
             // Delete uploaded file
             if (
@@ -361,10 +271,6 @@ router.post(
         }
       );
     } catch (error) {
-      console.error(
-        "CAROUSEL UPLOAD ERROR:",
-        error
-      );
 
       return res.status(500).json({
         success: false,
@@ -458,10 +364,6 @@ router.put(
         data: image,
       });
     } catch (error) {
-      console.error(
-        "EDIT CAROUSEL ERROR:",
-        error
-      );
 
       return res.status(500).json({
         success: false,
@@ -581,10 +483,6 @@ router.delete(
           "Carousel image deleted successfully",
       });
     } catch (error) {
-      console.error(
-        "DELETE CAROUSEL ERROR:",
-        error
-      );
 
       return res.status(500).json({
         success: false,

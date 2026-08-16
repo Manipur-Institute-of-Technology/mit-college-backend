@@ -25,7 +25,6 @@ const ProjectSchema = new Schema(
 			required: true,
 			validate: (val) => {
 				if (!validator.isURL(val)) {
-					console.error(`invalid paperLink: ${val}`);
 					return false;
 				}
 				return true;
@@ -36,7 +35,6 @@ const ProjectSchema = new Schema(
 			required: false,
 			validate: (val) => {
 				if (!validator.isURL(val)) {
-					console.error(`invalid projet repo Link: ${val}`);
 					return false;
 				}
 				return true;
@@ -50,7 +48,6 @@ const ProjectSchema = new Schema(
 					required: true,
 					validate: (val) => {
 						if (!validator.isEmail(val)) {
-							console.error(`student email is not valid: ${val}`);
 							return false;
 						}
 						return true;
@@ -73,7 +70,6 @@ const ProjectSchema = new Schema(
 					required: true,
 					validate: (val) => {
 						if (!validator.isURL(val)) {
-							console.error(`invalid socialLink: ${val}`);
 							return false;
 						}
 						return true;

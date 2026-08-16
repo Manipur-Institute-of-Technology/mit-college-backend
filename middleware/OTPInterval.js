@@ -73,11 +73,6 @@ const OTPInterval =
             next();
 
         } catch (error) {
-            console.error(
-                "OTP INTERVAL ERROR:",
-                error
-            );
-
             return res
                 .status(500)
                 .json(
@@ -96,4 +91,3 @@ const OTPInterval =
     };
 
 module.exports = OTPInterval;
-

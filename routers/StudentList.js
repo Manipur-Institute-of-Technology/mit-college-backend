@@ -56,11 +56,6 @@ const deleteFileSafely = (filePath) => {
       fs.unlinkSync(filePath);
     }
   } catch (error) {
-    console.error(
-      "Failed to delete file:",
-      filePath,
-      error.message
-    );
   }
 };
 
@@ -111,10 +106,6 @@ router.get(
       });
 
     } catch (error) {
-      console.error(
-        "GET student lists error:",
-        error
-      );
 
       return res.status(500).json({
         message:
@@ -162,10 +153,6 @@ router.get(
       });
 
     } catch (error) {
-      console.error(
-        "GET student list error:",
-        error
-      );
 
       return res.status(500).json({
         message:
@@ -351,10 +338,6 @@ router.post(
       });
 
     } catch (error) {
-      console.error(
-        "ADD student list error:",
-        error
-      );
 
       if (uploadedFilePath) {
         deleteFileSafely(
@@ -589,10 +572,6 @@ router.put(
       });
 
     } catch (error) {
-      console.error(
-        "EDIT student list error:",
-        error
-      );
 
       if (newFilePath) {
         deleteFileSafely(
@@ -664,10 +643,6 @@ router.delete(
       });
 
     } catch (error) {
-      console.error(
-        "DELETE student list error:",
-        error
-      );
 
       return res.status(500).json({
         message:

@@ -553,8 +553,6 @@ router.post(
         })
       );
     } catch (err) {
-      console.error("REQUEST FACULTY ERROR:", err);
-
       return res.status(500).json(
         apiResponse(null, {
           code: "REQUEST_FACULTY_ERROR",
@@ -645,7 +643,7 @@ router.post(
         middleName: request.middleName,
         lastName: request.lastName,
         sex: request.sex,
-        startDate: request.startDate,
+        dob: request.dob,
         departmentId: request.departmentId,
         hod: request.hod,
         highestDegree: request.highestDegree,
@@ -668,8 +666,6 @@ router.post(
       });
 
     } catch (err) {
-      console.error("ACCEPT FACULTY ERROR:", err);
-
       res.status(500).json({
         error: err.message,
       });

@@ -28,8 +28,6 @@ router.get("/", async (req, res) => {
       data: downloads,
     });
   } catch (error) {
-    console.error("Fetch downloads:", error);
-
     res.status(500).json({
       error: "Failed to fetch downloads",
     });
@@ -75,8 +73,6 @@ router.post(
         data: download,
       });
     } catch (error) {
-      console.error("Add download:", error);
-
       res.status(500).json({
         error: "Failed to upload download",
       });
@@ -129,8 +125,6 @@ router.delete(
         message: "Download deleted successfully",
       });
     } catch (error) {
-      console.error("Delete download:", error);
-
       res.status(500).json({
         error: "Failed to delete download",
       });

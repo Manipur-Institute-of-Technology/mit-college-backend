@@ -22,8 +22,6 @@ router.get("/", async (req, res) => {
       data: items,
     });
   } catch (error) {
-    console.error("GET AICTE-VAANI ERROR:", error);
-
     return res.status(500).json({
       error: "Failed to fetch AICTE-VAANI records",
       details: error.message,
@@ -57,8 +55,6 @@ router.get("/:id", async (req, res) => {
       data: item,
     });
   } catch (error) {
-    console.error("GET SINGLE AICTE-VAANI ERROR:", error);
-
     return res.status(500).json({
       error: "Failed to fetch AICTE-VAANI record",
       details: error.message,
@@ -184,8 +180,6 @@ router.post(
         data: savedItem,
       });
     } catch (error) {
-      console.error("ADD AICTE-VAANI ERROR:", error);
-
       return res.status(500).json({
         error: "Failed to create AICTE-VAANI event",
         details: error.message,
@@ -329,8 +323,6 @@ router.put(
         data: updatedItem,
       });
     } catch (error) {
-      console.error("UPDATE AICTE-VAANI ERROR:", error);
-
       return res.status(500).json({
         error: "Failed to update AICTE-VAANI event",
         details: error.message,
@@ -372,8 +364,6 @@ router.delete(
         message: "AICTE-VAANI event deleted successfully",
       });
     } catch (error) {
-      console.error("DELETE AICTE-VAANI ERROR:", error);
-
       return res.status(500).json({
         error: "Failed to delete AICTE-VAANI event",
         details: error.message,

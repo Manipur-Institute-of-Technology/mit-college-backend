@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const FacultyProfile = require("../model/facultyProfile");
 const apiResponse = require("../utils/apiResponse");
 const Paper = require("../model/paper");
+const Account = require("../model/account");
 
 const router = express.Router();
 
@@ -56,8 +57,6 @@ router.get("/", async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("FETCH FACULTY FAILED:", error);
-
     return res.status(500).json({
       success: false,
       message: "Failed to fetch faculty",
@@ -157,11 +156,6 @@ router.get("/department/:department", async (req, res) => {
       })
     );
   } catch (err) {
-    console.error(
-      "FETCH DEPARTMENT FACULTY FAILED:",
-      err
-    );
-
     return res.status(500).json(
       apiResponse(null, {
         code: "FETCH_DEPARTMENT_FACULTY_FAILED",
@@ -185,14 +179,9 @@ router.get("/:accountId", async (req, res) => {
   try {
     const { accountId } = req.params;
 
-    console.log("================================");
-    console.log("FACULTY PROFILE API HIT");
-    console.log("Account ID:", accountId);
-    console.log("================================");
-
-    // --------------------------------------------------
-    // VALIDATE OBJECT ID
-    // --------------------------------------------------
+    // ==========================================================
+    // VALIDATE ACCOUNT ID
+    // ==========================================================
 
     if (!mongoose.Types.ObjectId.isValid(accountId)) {
       return res.status(400).json(
@@ -203,20 +192,43 @@ router.get("/:accountId", async (req, res) => {
       );
     }
 
-    // --------------------------------------------------
-    // FIND FACULTY USING accountId
-    // --------------------------------------------------
+    const objectAccountId =
+      new mongoose.Types.ObjectId(accountId);
 
-    const faculty = await FacultyProfile.aggregate([
+    // ==========================================================
+    // DEBUG: CHECK ACCOUNT
+    // ==========================================================
+
+    const account = await Account.findById(
+      objectAccountId
+    ).lean();
+
+    if (!account) {
+      return res.status(404).json(
+        apiResponse(null, {
+          code: "ACCOUNT_NOT_FOUND",
+          message: "Account not found",
+        })
+      );
+    }
+
+    // ==========================================================
+    // FIND FACULTY
+    //
+    // IMPORTANT:
+    // Try ObjectId first.
+    // ==========================================================
+
+    let faculty = await FacultyProfile.aggregate([
       {
         $match: {
-          accountId: new mongoose.Types.ObjectId(accountId),
+          accountId: objectAccountId,
         },
       },
 
-      // ------------------------------------------------
+      // ========================================================
       // PAPERS
-      // ------------------------------------------------
+      // ========================================================
 
       {
         $lookup: {
@@ -227,9 +239,9 @@ router.get("/:accountId", async (req, res) => {
         },
       },
 
-      // ------------------------------------------------
+      // ========================================================
       // DEPARTMENT
-      // ------------------------------------------------
+      // ========================================================
 
       {
         $lookup: {
@@ -240,9 +252,9 @@ router.get("/:accountId", async (req, res) => {
         },
       },
 
-      // ------------------------------------------------
-      // UNWIND DEPARTMENT
-      // ------------------------------------------------
+      // ========================================================
+      // DEPARTMENT
+      // ========================================================
 
       {
         $unwind: {
@@ -251,15 +263,14 @@ router.get("/:accountId", async (req, res) => {
         },
       },
 
-      // ------------------------------------------------
+      // ========================================================
       // PROJECT
-      // ------------------------------------------------
+      // ========================================================
 
       {
         $project: {
           _id: 1,
 
-          // Account reference
           accountId: 1,
 
           // Name
@@ -275,7 +286,7 @@ router.get("/:accountId", async (req, res) => {
 
           // Personal
           sex: 1,
-          startDate: 1,
+          dob: 1,
 
           // Faculty
           roles: 1,
@@ -302,27 +313,113 @@ router.get("/:accountId", async (req, res) => {
       },
     ]);
 
-    console.log(
-      "FACULTY PROFILE RESULT:",
-      JSON.stringify(faculty, null, 2)
-    );
+    // ==========================================================
+    // DEBUG
+    // ==========================================================
 
-    // --------------------------------------------------
-    // FACULTY NOT FOUND
-    // --------------------------------------------------
+    // ==========================================================
+    // IF NOT FOUND, CHECK STRING accountId
+    // ==========================================================
+
+    if (!faculty.length) {
+      const allFaculty =
+        await FacultyProfile.find({})
+          .select("_id accountId firstName lastName email")
+          .lean();
+
+      // --------------------------------------------------------
+      // Try string accountId
+      // --------------------------------------------------------
+
+      faculty = await FacultyProfile.aggregate([
+        {
+          $match: {
+            accountId: accountId,
+          },
+        },
+
+        {
+          $lookup: {
+            from: Paper.collection.name,
+            localField: "_id",
+            foreignField: "facultyId",
+            as: "papers",
+          },
+        },
+
+        {
+          $lookup: {
+            from: "departments",
+            localField: "departmentId",
+            foreignField: "_id",
+            as: "department",
+          },
+        },
+
+        {
+          $unwind: {
+            path: "$department",
+            preserveNullAndEmptyArrays: true,
+          },
+        },
+
+        {
+          $project: {
+            _id: 1,
+            accountId: 1,
+
+            namePrefix: 1,
+            firstName: 1,
+            middleName: 1,
+            lastName: 1,
+
+            email: 1,
+            phoneNumber: 1,
+            contactInfo: 1,
+
+            sex: 1,
+            dob: 1,
+
+            roles: 1,
+            hod: 1,
+            highestDegree: 1,
+            expertFields: 1,
+            bios: 1,
+
+            photoId: 1,
+            photo: 1,
+
+            departmentId: 1,
+            department: 1,
+
+            papers: 1,
+
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        },
+      ]);
+
+    }
+
+    // ==========================================================
+    // STILL NOT FOUND
+    // ==========================================================
 
     if (!faculty.length) {
       return res.status(404).json(
         apiResponse(null, {
           code: "FACULTY_NOT_FOUND",
-          message: "Faculty profile not found for this account",
+          message:
+            "Faculty profile not found for this account",
+          accountId,
         })
       );
     }
 
-    // --------------------------------------------------
+    // ==========================================================
     // SUCCESS
-    // --------------------------------------------------
+    // ==========================================================
 
     return res.status(200).json(
       apiResponse({
@@ -331,11 +428,6 @@ router.get("/:accountId", async (req, res) => {
     );
 
   } catch (err) {
-    console.error(
-      "FETCH FACULTY PROFILE FAILED:",
-      err
-    );
-
     return res.status(500).json(
       apiResponse(null, {
         code: "FETCH_FACULTY_PROFILE_FAILED",
@@ -359,11 +451,6 @@ router.get("/:accountId", async (req, res) => {
 router.get("/account/:accountId", async (req, res) => {
   try {
     const accountId = req.params.accountId;
-
-    console.log("================================");
-    console.log("FACULTY BY ACCOUNT ID API HIT");
-    console.log("Account ID:", accountId);
-    console.log("================================");
 
     if (!mongoose.Types.ObjectId.isValid(accountId)) {
       return res.status(400).json(
@@ -453,11 +540,6 @@ router.get("/account/:accountId", async (req, res) => {
       })
     );
   } catch (err) {
-    console.error(
-      "FETCH FACULTY BY ACCOUNT ID FAILED:",
-      err
-    );
-
     return res.status(500).json(
       apiResponse(null, {
         code: "FETCH_FACULTY_FAILED",

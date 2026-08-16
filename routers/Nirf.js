@@ -70,21 +70,9 @@ const deleteFileIfExists = (filePath) => {
     if (fs.existsSync(actualPath)) {
       fs.unlinkSync(actualPath);
 
-      console.log(
-        "NIRF FILE DELETED:",
-        actualPath
-      );
     } else {
-      console.log(
-        "NIRF FILE NOT FOUND:",
-        actualPath
-      );
     }
   } catch (error) {
-    console.error(
-      "NIRF FILE DELETE ERROR:",
-      error.message
-    );
   }
 };
 
@@ -137,11 +125,6 @@ const handleUpload = upload.single("file");
 const handleMulterUpload = (req, res, next) => {
   handleUpload(req, res, (error) => {
     if (error) {
-      console.error(
-        "NIRF MULTER ERROR:",
-        error
-      );
-
       return res.status(400).json({
         success: false,
         message:
@@ -176,10 +159,6 @@ router.get(
         data: nirfList,
       });
     } catch (error) {
-      console.error(
-        "GET NIRF ERROR:",
-        error
-      );
 
       return res.status(500).json({
         success: false,
@@ -227,10 +206,6 @@ router.get(
         data: nirf,
       });
     } catch (error) {
-      console.error(
-        "GET SINGLE NIRF ERROR:",
-        error
-      );
 
       return res.status(500).json({
         success: false,
@@ -261,28 +236,6 @@ router.post(
 
   async (req, res) => {
     try {
-      console.log(
-        "================================="
-      );
-
-      console.log(
-        "NIRF ADD REQUEST"
-      );
-
-      console.log(
-        "================================="
-      );
-
-      console.log(
-        "BODY:",
-        req.body
-      );
-
-      console.log(
-        "FILE:",
-        req.file
-      );
-
       // ========================================================
       // BASIC DATA
       // ========================================================
@@ -317,11 +270,6 @@ router.post(
 
       const resourceUrl =
         resource.url.trim();
-
-      console.log(
-        "RESOURCE:",
-        resource
-      );
 
       // ========================================================
       // VALIDATION
@@ -405,11 +353,6 @@ router.post(
         const savedNirf =
           await nirf.save();
 
-        console.log(
-          "NIRF CREATED:",
-          savedNirf._id
-        );
-
         return res.status(201).json({
           success: true,
           message:
@@ -454,11 +397,6 @@ router.post(
         const savedNirf =
           await nirf.save();
 
-        console.log(
-          "NIRF CREATED:",
-          savedNirf._id
-        );
-
         return res.status(201).json({
           success: true,
           message:
@@ -475,10 +413,6 @@ router.post(
           "Invalid NIRF resource.",
       });
     } catch (error) {
-      console.error(
-        "NIRF ADD ERROR:",
-        error
-      );
 
       cleanupUploadedFile(req);
 
@@ -512,33 +446,6 @@ router.put(
     try {
       const { id } =
         req.params;
-
-      console.log(
-        "================================="
-      );
-
-      console.log(
-        "NIRF EDIT REQUEST"
-      );
-
-      console.log(
-        "================================="
-      );
-
-      console.log(
-        "ID:",
-        id
-      );
-
-      console.log(
-        "BODY:",
-        req.body
-      );
-
-      console.log(
-        "FILE:",
-        req.file
-      );
 
       // ========================================================
       // VALIDATE ID
@@ -705,11 +612,6 @@ router.put(
         const updated =
           await existing.save();
 
-        console.log(
-          "NIRF UPDATED TO LINK:",
-          updated._id
-        );
-
         return res.status(200).json({
           success: true,
           message:
@@ -794,11 +696,6 @@ router.put(
         const updated =
           await existing.save();
 
-        console.log(
-          "NIRF UPDATED TO FILE:",
-          updated._id
-        );
-
         return res.status(200).json({
           success: true,
           message:
@@ -815,10 +712,6 @@ router.put(
           "Invalid NIRF resource.",
       });
     } catch (error) {
-      console.error(
-        "NIRF EDIT ERROR:",
-        error
-      );
 
       cleanupUploadedFile(req);
 
@@ -850,23 +743,6 @@ router.delete(
     try {
       const { id } =
         req.params;
-
-      console.log(
-        "================================="
-      );
-
-      console.log(
-        "NIRF DELETE REQUEST"
-      );
-
-      console.log(
-        "ID:",
-        id
-      );
-
-      console.log(
-        "================================="
-      );
 
       // ========================================================
       // VALIDATE ID
@@ -922,21 +798,12 @@ router.delete(
         _id: id,
       });
 
-      console.log(
-        "NIRF DELETED:",
-        id
-      );
-
       return res.status(200).json({
         success: true,
         message:
           "NIRF record deleted successfully.",
       });
     } catch (error) {
-      console.error(
-        "NIRF DELETE ERROR:",
-        error
-      );
 
       return res.status(500).json({
         success: false,

@@ -28,8 +28,6 @@ router.get("/", async (req, res) => {
       data: information,
     });
   } catch (error) {
-    console.error("Fetch information:", error);
-
     res.status(500).json({
       error: "Failed to fetch information",
     });
@@ -75,8 +73,6 @@ router.post(
         data: information,
       });
     } catch (error) {
-      console.error("Add information:", error);
-
       res.status(500).json({
         error: "Failed to upload information",
       });
@@ -129,8 +125,6 @@ router.delete(
         message: "Information deleted successfully",
       });
     } catch (error) {
-      console.error("Delete information:", error);
-
       res.status(500).json({
         error: "Failed to delete information",
       });

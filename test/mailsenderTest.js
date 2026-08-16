@@ -13,5 +13,5 @@ mailSender(
 	`<h1>Please confirm your OTP</h1>
      <p>Here is your OTP code: <b>${otpToken}</b></p>`
 )
-	.then((info) => console.log("Mail sent:", info.messageId))
-	.catch((err) => console.error("Mail error:", err.message));
+	.then(() => {})
+	.catch(() => {});

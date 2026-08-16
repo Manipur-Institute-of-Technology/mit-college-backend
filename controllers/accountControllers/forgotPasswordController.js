@@ -81,9 +81,6 @@ const forgotPasswordGet = async (req, res) => {
         // =====================================================
         // GENERATE NUMERIC OTP
         // =====================================================
-		console.log("OTP_TOKEN_LEN from ENV:", process.env.OTP_TOKEN_LEN);
-		console.log("OTP length:", Number(process.env.OTP_TOKEN_LEN));
-
         const otpTokenStr = otpGen.generate(
             Number(process.env.OTP_TOKEN_LEN),
             {
@@ -157,39 +154,6 @@ const forgotPasswordGet = async (req, res) => {
         );
 
         // =====================================================
-        // DEVELOPMENT LOG
-        // =====================================================
-
-        if (process.env.ENV === "dev") {
-            console.log(
-                "================================="
-            );
-
-            console.log(
-                "FORGOT PASSWORD OTP:"
-            );
-
-            console.log(
-                "Email:",
-                _acc.email
-            );
-
-            console.log(
-                "Account Type:",
-                _acc.accountType
-            );
-
-            console.log(
-                "OTP:",
-                otpTokenStr
-            );
-
-            console.log(
-                "================================="
-            );
-        }
-
-        // =====================================================
         // CREATE OTP ID TOKEN
         // =====================================================
 
@@ -225,10 +189,6 @@ const forgotPasswordGet = async (req, res) => {
         );
 
     } catch (err) {
-        console.error(
-            "FORGOT PASSWORD OTP ERROR:",
-            err
-        );
 
         return res.status(500).json(
             apiResponse(null, {
@@ -242,7 +202,6 @@ const forgotPasswordGet = async (req, res) => {
 };
 
 const forgotPasswordVerifyOTPPost = async (req, res) => {
-	console.log(req.body);
 	const otpTokenStr = req.body.otpToken,
 		otpIdToken = req.body.otpId;
 
@@ -294,7 +253,6 @@ const forgotPasswordVerifyOTPPost = async (req, res) => {
 				apiResponse({ message: "OTP successfully verify", token: jwtToken }),
 			);
 	} catch (err) {
-		console.error(err);
 		res.status(401).json(
 			apiResponse(null, {
 				code: "OTP_VERIFICATION_ERROR",
@@ -307,7 +265,6 @@ const forgotPasswordVerifyOTPPost = async (req, res) => {
 const forgotPasswordOTPPost = async (req, res) => {
 	const jwtOtpToken = req.body.otpToken;
 	const password = req.body.password;
-	console.log(password, jwtOtpToken);
 	try {
 		// Verify token
 		const decoded = jwt.verify(jwtOtpToken, process.env.JWT_SECRET, {
@@ -315,12 +272,9 @@ const forgotPasswordOTPPost = async (req, res) => {
 		});
 		// check otp verified or not
 		const otpTokenId = decoded.id;
-		console.log(decoded);
 		const { expiredAt } = decoded;
-		console.log(typeof expiredAt);
 
 		if (Date.now() >= new Date(expiredAt).getTime()) {
-			console.log("expired token");
 			return res.status(401).json(
 				apiResponse(null, {
 					code: "OTP_VERIFICATION_ERROR",
@@ -360,7 +314,6 @@ const forgotPasswordOTPPost = async (req, res) => {
 			.status(201)
 			.json(apiResponse({ message: `password successfully changed` }));
 	} catch (err) {
-		console.error(err);
 		res.status(401).json(
 			apiResponse(null, {
 				code: "OTP_VERIFICATION_ERROR",
@@ -414,7 +367,6 @@ const forgotPasswordPermTokenPost = async (req, res) => {
 			email: _acc.email,
 		});
 	} catch (err) {
-		console.error(err);
 
 		await session.abortTransaction();
 		session.endSession();

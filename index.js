@@ -72,7 +72,6 @@ app.use((req, res, next) => {
 
 
 app.use((err, req, res, next) => {
-	console.error(err.stack);
 	return res.status(500).send(
 		apiResponse(null, {
 			code: "INTERNAL_SERVER_ERROR",
@@ -81,24 +80,6 @@ app.use((err, req, res, next) => {
 	);
 });
 
-const os = require("os");
-
-const getHost = () => {
-  const nets = os.networkInterfaces();
-  for (const name of Object.keys(nets)) {
-    for (const net of nets[name]) {
-      if (net.family === "IPv4" && !net.internal) {
-        return net.address;
-      }
-    }
-  }
-  return "127.0.0.1";
-};
-
-app.listen(process.env.PORT, () => {
-	const host = getHost();
-	console.log(`Listening on port: http://${host}:${process.env.PORT}`);
-});
-
+app.listen(process.env.PORT);
 
 
