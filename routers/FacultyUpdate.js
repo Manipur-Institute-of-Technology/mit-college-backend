@@ -1,5 +1,8 @@
 const express = require("express");
 const mongoose = require("mongoose");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
 
 const FacultyProfile = require("../model/facultyProfile");
 
@@ -10,6 +13,116 @@ const Paper = require("../model/paper");
 const Account = require("../model/account");
 
 const router = express.Router();
+
+
+// ============================================================
+// FACULTY PHOTO UPLOAD
+// ============================================================
+
+const facultyUploadDir = path.join(
+  process.cwd(),
+  "uploads",
+  "faculty"
+);
+
+
+// Create uploads/faculty if it doesn't exist
+if (!fs.existsSync(facultyUploadDir)) {
+  fs.mkdirSync(facultyUploadDir, {
+    recursive: true,
+  });
+}
+
+
+// ============================================================
+// MULTER STORAGE
+// ============================================================
+
+const facultyPhotoStorage =
+  multer.diskStorage({
+
+    destination: (req, file, cb) => {
+      cb(
+        null,
+        facultyUploadDir
+      );
+    },
+
+    filename: (req, file, cb) => {
+
+      const extension =
+        path.extname(
+          file.originalname
+        ).toLowerCase();
+
+      const filename =
+        `${Date.now()}-${Math.round(
+          Math.random() * 1e9
+        )}${extension}`;
+
+      cb(
+        null,
+        filename
+      );
+    },
+
+  });
+
+
+// ============================================================
+// FILE FILTER
+// ============================================================
+
+const facultyPhotoFilter =
+  (req, file, cb) => {
+
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/webp",
+    ];
+
+    if (
+      allowedTypes.includes(
+        file.mimetype
+      )
+    ) {
+
+      cb(null, true);
+
+    } else {
+
+      cb(
+        new Error(
+          "Only JPG, JPEG, and WEBP images are allowed"
+        ),
+        false
+      );
+
+    }
+
+  };
+
+
+// ============================================================
+// MULTER INSTANCE
+// ============================================================
+
+const uploadFacultyPhoto =
+  multer({
+
+    storage:
+      facultyPhotoStorage,
+
+    fileFilter:
+      facultyPhotoFilter,
+
+    limits: {
+      fileSize:
+        5 * 1024 * 1024,
+    },
+
+  });
 
 
 // ============================================================
@@ -237,245 +350,258 @@ router.put(
 // ============================================================
 
 router.put(
-  "/:id",
+  "/me/photo",
+
   JWTAuthentication,
-  Authorization(["admin"]),
+
+  Authorization(["faculty"]),
+
+  uploadFacultyPhoto.single("photo"),
+
   async (req, res) => {
+
+    let newPhotoPath = null;
+
     try {
-      const { id } = req.params;
 
       // --------------------------------------------------------
-      // Validate Faculty ID
+      // Make sure a photo was uploaded
       // --------------------------------------------------------
 
-      if (!mongoose.Types.ObjectId.isValid(id)) {
+      if (!req.file) {
+
         return res.status(400).json({
           success: false,
-          message: "Invalid faculty ID",
+          message: "Profile photo is required",
         });
+
       }
 
-      // --------------------------------------------------------
-      // Allowed fields
-      // --------------------------------------------------------
+      newPhotoPath = req.file.path;
 
-      const allowedFields = [
-        "photoId",
-        "phoneNumber",
-        "contactInfo",
-        "namePrefix",
-        "firstName",
-        "middleName",
-        "lastName",
-        "sex",
-        "dob",
-        "departmentId",
-        "bios",
-        "highestDegree",
-        "expertFields",
-        "roles",
-        "hod",
-      ];
 
       // --------------------------------------------------------
-      // Build update object
+      // Find logged-in faculty
       // --------------------------------------------------------
 
-      const updateData = {};
-
-      for (const field of allowedFields) {
-        if (
-          Object.prototype.hasOwnProperty.call(
-            req.body,
-            field
-          )
-        ) {
-          updateData[field] =
-            req.body[field];
-        }
-      }
-
-      // --------------------------------------------------------
-      // Check update data
-      // --------------------------------------------------------
-
-      if (
-        Object.keys(updateData).length === 0
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "No valid fields provided for update",
-          allowedFields,
+      const faculty =
+        await FacultyProfile.findOne({
+          accountId: req.user._id,
         });
-      }
 
-      // --------------------------------------------------------
-      // Validate departmentId
-      // --------------------------------------------------------
 
-      if (
-        Object.prototype.hasOwnProperty.call(
-          updateData,
-          "departmentId"
-        )
-      ) {
+      if (!faculty) {
+
+        // New upload is not needed anymore
         if (
-          updateData.departmentId &&
-          !mongoose.Types.ObjectId.isValid(
-            updateData.departmentId
-          )
+          newPhotoPath &&
+          fs.existsSync(newPhotoPath)
         ) {
-          return res.status(400).json({
-            success: false,
-            message: "Invalid department ID",
-          });
-        }
-      }
-
-      // --------------------------------------------------------
-      // Validate DOB
-      // --------------------------------------------------------
-
-      if (
-        Object.prototype.hasOwnProperty.call(
-          updateData,
-          "dob"
-        )
-      ) {
-        if (!updateData.dob) {
-          return res.status(400).json({
-            success: false,
-            message: "Date of birth is required",
-          });
+          fs.unlinkSync(newPhotoPath);
         }
 
-        const dob =
-          new Date(updateData.dob);
-
-        if (
-          Number.isNaN(
-            dob.getTime()
-          )
-        ) {
-          return res.status(400).json({
-            success: false,
-            message:
-              "Invalid date of birth",
-          });
-        }
-
-        updateData.dob = dob;
-      }
-
-      // --------------------------------------------------------
-      // Update faculty
-      // --------------------------------------------------------
-
-      const updatedFaculty =
-        await FacultyProfile.findByIdAndUpdate(
-          id,
-          {
-            $set: updateData,
-          },
-          {
-            new: true,
-            runValidators: true,
-            context: "query",
-          }
-        );
-
-      // --------------------------------------------------------
-      // Faculty not found
-      // --------------------------------------------------------
-
-      if (!updatedFaculty) {
         return res.status(404).json({
           success: false,
-          message: "Faculty not found",
+          message: "Faculty profile not found",
         });
+
       }
 
+
       // --------------------------------------------------------
-      // Success
+      // Remember the previous photo
+      // --------------------------------------------------------
+
+      const oldPhotoId =
+        faculty.photoId || null;
+
+
+      // --------------------------------------------------------
+      // Set the new photo
+      // --------------------------------------------------------
+
+      faculty.photoId =
+        req.file.filename;
+
+
+      // --------------------------------------------------------
+      // IMPORTANT:
+      // Save the new photo reference FIRST
+      // --------------------------------------------------------
+
+      await faculty.save();
+
+
+      // --------------------------------------------------------
+      // Database save succeeded.
+      //
+      // NOW delete the previous physical image.
+      // --------------------------------------------------------
+
+      if (
+        oldPhotoId &&
+        oldPhotoId !== req.file.filename
+      ) {
+
+        const oldPhotoPath =
+          path.join(
+            facultyUploadDir,
+            oldPhotoId
+          );
+
+
+        if (
+          fs.existsSync(oldPhotoPath)
+        ) {
+
+          try {
+
+            fs.unlinkSync(
+              oldPhotoPath
+            );
+
+            console.log(
+              `Deleted previous faculty photo: ${oldPhotoId}`
+            );
+
+          } catch (deleteError) {
+
+            // Do not fail the request because
+            // the database already has the new photo.
+            console.error(
+              "Failed to delete previous faculty photo:",
+              deleteError
+            );
+
+          }
+
+        } else {
+
+          console.log(
+            `Previous faculty photo not found: ${oldPhotoId}`
+          );
+
+        }
+
+      }
+
+
+      // --------------------------------------------------------
+      // Return updated faculty
       // --------------------------------------------------------
 
       return res.status(200).json({
+
         success: true,
+
         message:
-          "Faculty profile updated successfully",
-        data: updatedFaculty,
+          "Profile photo updated successfully",
+
+        data: {
+
+          faculty,
+
+          photoId:
+            faculty.photoId,
+
+          photoUrl:
+            `/uploads/faculty/${faculty.photoId}`,
+
+        },
+
       });
 
     } catch (error) {
+
       // --------------------------------------------------------
-      // Mongoose Validation Error
+      // If database update failed, remove the NEW upload.
+      //
+      // This prevents an orphan image from remaining on disk.
+      // --------------------------------------------------------
+
+      if (
+        newPhotoPath &&
+        fs.existsSync(newPhotoPath)
+      ) {
+
+        try {
+
+          fs.unlinkSync(
+            newPhotoPath
+          );
+
+        } catch (deleteError) {
+
+          console.error(
+            "Failed to clean up new photo:",
+            deleteError
+          );
+
+        }
+
+      }
+
+
+      // --------------------------------------------------------
+      // Multer errors
       // --------------------------------------------------------
 
       if (
         error instanceof
-        mongoose.Error.ValidationError
+        multer.MulterError
       ) {
-        const errors =
-          Object.values(
-            error.errors
-          ).map((err) => ({
-            field: err.path,
-            value: err.value,
-            kind: err.kind,
-            message: err.message,
-          }));
+
+        if (
+          error.code ===
+          "LIMIT_FILE_SIZE"
+        ) {
+
+          return res.status(400).json({
+
+            success: false,
+
+            message:
+              "Profile photo must be smaller than 5 MB",
+
+          });
+
+        }
+
 
         return res.status(400).json({
+
           success: false,
+
           message:
-            "Faculty validation failed",
-          errors,
+            error.message,
+
         });
+
       }
 
-      // --------------------------------------------------------
-      // Cast Error
-      // --------------------------------------------------------
-
-      if (
-        error instanceof
-        mongoose.Error.CastError
-      ) {
-        return res.status(400).json({
-          success: false,
-          message:
-            `Invalid value for ${error.path}`,
-          field: error.path,
-          value: error.value,
-          kind: error.kind,
-        });
-      }
 
       // --------------------------------------------------------
-      // Duplicate Key
+      // General error
       // --------------------------------------------------------
 
-      if (error.code === 11000) {
-        return res.status(400).json({
-          success: false,
-          message:
-            "Duplicate value already exists",
-          fields: error.keyValue,
-        });
-      }
+      console.error(
+        "Faculty photo upload error:",
+        error
+      );
 
-      // --------------------------------------------------------
-      // Other Error
-      // --------------------------------------------------------
 
       return res.status(500).json({
+
         success: false,
+
         message:
           error.message ||
-          "Unable to update faculty profile",
+          "Unable to update profile photo",
+
       });
+
     }
+
   }
 );
 
@@ -491,18 +617,13 @@ router.delete(
   Authorization(["admin"]),
   async (req, res) => {
     try {
-      const { accountId } =
-        req.params;
+      const { accountId } = req.params;
 
       // --------------------------------------------------------
       // Validate Account ID
       // --------------------------------------------------------
 
-      if (
-        !mongoose.Types.ObjectId.isValid(
-          accountId
-        )
-      ) {
+      if (!mongoose.Types.ObjectId.isValid(accountId)) {
         return res.status(400).json({
           success: false,
           message: "Invalid account ID",
@@ -513,10 +634,7 @@ router.delete(
       // Find Account
       // --------------------------------------------------------
 
-      const account =
-        await Account.findById(
-          accountId
-        );
+      const account = await Account.findById(accountId);
 
       if (!account) {
         return res.status(404).json({
@@ -529,10 +647,7 @@ router.delete(
       // Check faculty account
       // --------------------------------------------------------
 
-      if (
-        account.accountType !==
-        "faculty"
-      ) {
+      if (account.accountType !== "faculty") {
         return res.status(400).json({
           success: false,
           message:
@@ -544,13 +659,9 @@ router.delete(
       // Find Faculty Profile
       // --------------------------------------------------------
 
-      const faculty =
-        await FacultyProfile.findOne({
-          accountId:
-            new mongoose.Types.ObjectId(
-              accountId
-            ),
-        });
+      const faculty = await FacultyProfile.findOne({
+        accountId: new mongoose.Types.ObjectId(accountId),
+      });
 
       if (!faculty) {
         return res.status(404).json({
@@ -561,13 +672,18 @@ router.delete(
       }
 
       // --------------------------------------------------------
+      // Save photo ID before deleting faculty profile
+      // --------------------------------------------------------
+
+      const oldPhotoId = faculty.photoId;
+
+      // --------------------------------------------------------
       // Delete Papers
       // --------------------------------------------------------
 
-      const paperResult =
-        await Paper.deleteMany({
-          facultyId: faculty._id,
-        });
+      const paperResult = await Paper.deleteMany({
+        facultyId: faculty._id,
+      });
 
       // --------------------------------------------------------
       // Delete Faculty Profile
@@ -578,12 +694,34 @@ router.delete(
       );
 
       // --------------------------------------------------------
+      // Delete Profile Photo
+      // --------------------------------------------------------
+
+      if (oldPhotoId) {
+        try {
+          const photoPath = path.join(
+            process.cwd(),
+            "uploads",
+            "faculty",
+            oldPhotoId
+          );
+
+          if (fs.existsSync(photoPath)) {
+            fs.unlinkSync(photoPath);
+          }
+        } catch (photoError) {
+          console.error(
+            "Unable to delete faculty photo:",
+            photoError
+          );
+        }
+      }
+
+      // --------------------------------------------------------
       // Delete Account
       // --------------------------------------------------------
 
-      await Account.findByIdAndDelete(
-        accountId
-      );
+      await Account.findByIdAndDelete(accountId);
 
       // --------------------------------------------------------
       // Success
@@ -592,14 +730,14 @@ router.delete(
       return res.status(200).json({
         success: true,
         message:
-          "Faculty account, profile, and associated papers deleted successfully",
+          "Faculty account, profile, photo, and associated papers deleted successfully",
 
         data: {
-          accountId:
-            account._id,
+          accountId: account._id,
 
-          facultyId:
-            faculty._id,
+          facultyId: faculty._id,
+
+          photoDeleted: !!oldPhotoId,
 
           papersDeleted:
             paperResult.deletedCount,
@@ -607,7 +745,6 @@ router.delete(
       });
 
     } catch (error) {
-
       return res.status(500).json({
         success: false,
         message:
