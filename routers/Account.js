@@ -43,25 +43,10 @@ router.post(
       } = req.body;
 
       // -----------------------------------------
-      // Email
-      // -----------------------------------------
-
-      if (!email || !validator.isEmail(email)) {
-        return res.status(400).json(
-          apiResponse(null, {
-            code: "INVALID_EMAIL",
-            message: "Valid email is required",
-          })
-        );
-      }
-
-      // -----------------------------------------
       // Account type
       // -----------------------------------------
 
-      if (
-        !["faculty", "admin"].includes(accountType)
-      ) {
+      if (!["faculty", "admin"].includes(accountType)) {
         return res.status(400).json(
           apiResponse(null, {
             code: "INVALID_ACCOUNT_TYPE",
@@ -71,25 +56,34 @@ router.post(
       }
 
       // -----------------------------------------
-      // Admin MUST use password
+      // ADMIN LOGIN
       // -----------------------------------------
 
       if (accountType === "admin") {
+        if (!email || !validator.isEmail(email)) {
+          return res.status(400).json(
+            apiResponse(null, {
+              code: "INVALID_EMAIL",
+              message: "Valid email is required",
+            })
+          );
+        }
+
         if (
-          !password ||
-          !passwordValidator(password)
+          typeof password !== "string" ||
+          password.length === 0
         ) {
           return res.status(400).json(
             apiResponse(null, {
               code: "INVALID_PASSWORD",
-              message: "Valid password is required",
+              message: "Password is required",
             })
           );
         }
       }
 
       // -----------------------------------------
-      // Faculty
+      // FACULTY LOGIN
       // -----------------------------------------
 
       if (accountType === "faculty") {
@@ -101,6 +95,7 @@ router.post(
           typeof securityCode === "string" &&
           /^\d{6}$/.test(securityCode);
 
+        // Must provide one
         if (!hasPassword && !hasSecurityCode) {
           return res.status(400).json(
             apiResponse(null, {
@@ -122,16 +117,16 @@ router.post(
           );
         }
 
-        if (
-          hasPassword &&
-          !passwordValidator(password)
-        ) {
-          return res.status(400).json(
-            apiResponse(null, {
-              code: "INVALID_PASSWORD",
-              message: "Invalid password",
-            })
-          );
+        // Password login requires email
+        if (hasPassword) {
+          if (!email || !validator.isEmail(email)) {
+            return res.status(400).json(
+              apiResponse(null, {
+                code: "INVALID_EMAIL",
+                message: "Valid email is required",
+              })
+            );
+          }
         }
       }
 
@@ -507,9 +502,12 @@ router.post(
           })
         );
       }
-
+      
       const department = await Department.findOne({
-        name: departmentName.trim().toLowerCase(),
+        name: {
+          $regex: `^${departmentName.trim()}$`,
+          $options: "i",
+        },
       });
 
       if (!department) {
