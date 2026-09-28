@@ -82,6 +82,139 @@ router.post(
 
 /*
 |--------------------------------------------------------------------------
+| UPDATE DOWNLOAD
+|--------------------------------------------------------------------------
+| Can update:
+| - title only
+| - file only
+| - title + file
+|--------------------------------------------------------------------------
+*/
+router.put(
+  "/update/:id",
+  jwtAuth,
+  Authorization(["admin"]),
+  upload.single("file"),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        if (req.file) {
+          const uploadedFilePath = path.join(
+            __dirname,
+            "..",
+            "uploads",
+            "downloads",
+            req.file.filename
+          );
+
+          if (fs.existsSync(uploadedFilePath)) {
+            fs.unlinkSync(uploadedFilePath);
+          }
+        }
+
+        return res.status(400).json({
+          error: "Invalid download ID",
+        });
+      }
+
+      const download = await Download.findById(id);
+
+      if (!download) {
+        if (req.file) {
+          const uploadedFilePath = path.join(
+            __dirname,
+            "..",
+            "uploads",
+            "downloads",
+            req.file.filename
+          );
+
+          if (fs.existsSync(uploadedFilePath)) {
+            fs.unlinkSync(uploadedFilePath);
+          }
+        }
+
+        return res.status(404).json({
+          error: "Download not found",
+        });
+      }
+
+      const { title } = req.body;
+
+      // At least one field must be provided
+      if (
+        (!title || !title.trim()) &&
+        !req.file
+      ) {
+        return res.status(400).json({
+          error:
+            "Title or file is required",
+        });
+      }
+
+      // Update title if provided
+      if (title && title.trim()) {
+        download.title = title.trim();
+      }
+
+      // Replace file if provided
+      if (req.file) {
+        const oldFilePath = path.join(
+          __dirname,
+          "..",
+          "uploads",
+          "downloads",
+          download.fileName
+        );
+
+        if (fs.existsSync(oldFilePath)) {
+          fs.unlinkSync(oldFilePath);
+        }
+
+        download.fileName =
+          req.file.filename;
+      }
+
+      await download.save();
+
+      res.status(200).json({
+        message:
+          "Download updated successfully",
+        data: download,
+      });
+    } catch (error) {
+      console.error(
+        "Update download error:",
+        error
+      );
+
+      // Remove newly uploaded file if update fails
+      if (req.file) {
+        const uploadedFilePath = path.join(
+          __dirname,
+          "..",
+          "uploads",
+          "downloads",
+          req.file.filename
+        );
+
+        if (fs.existsSync(uploadedFilePath)) {
+          fs.unlinkSync(uploadedFilePath);
+        }
+      }
+
+      res.status(500).json({
+        error:
+          "Failed to update download",
+      });
+    }
+  }
+);
+
+/*
+|--------------------------------------------------------------------------
 | DELETE DOWNLOAD
 |--------------------------------------------------------------------------
 */

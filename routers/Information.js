@@ -80,6 +80,112 @@ router.post(
   }
 );
 
+router.put(
+  "/update/:id",
+  jwtAuth,
+  Authorization(["admin"]),
+  upload.single("file"),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({
+          error: "Invalid information ID",
+        });
+      }
+
+      const information = await Information.findById(id);
+
+      if (!information) {
+        // If a new file was uploaded but the record doesn't exist,
+        // remove the uploaded file to avoid orphan files.
+        if (req.file) {
+          const uploadedFilePath = path.join(
+            __dirname,
+            "..",
+            "uploads",
+            "informations",
+            req.file.filename
+          );
+
+          if (fs.existsSync(uploadedFilePath)) {
+            fs.unlinkSync(uploadedFilePath);
+          }
+        }
+
+        return res.status(404).json({
+          error: "Information not found",
+        });
+      }
+
+      const { title } = req.body;
+
+      // Check that at least one field is being updated
+      if (
+        (!title || !title.trim()) &&
+        !req.file
+      ) {
+        return res.status(400).json({
+          error: "Title or file is required",
+        });
+      }
+
+      // Update title if provided
+      if (title && title.trim()) {
+        information.title = title.trim();
+      }
+
+      // Update file if provided
+      if (req.file) {
+        const oldFilePath = path.join(
+          __dirname,
+          "..",
+          "uploads",
+          "informations",
+          information.fileName
+        );
+
+        // Delete old file
+        if (fs.existsSync(oldFilePath)) {
+          fs.unlinkSync(oldFilePath);
+        }
+
+        information.fileName = req.file.filename;
+      }
+
+      await information.save();
+
+      res.status(200).json({
+        message: "Information updated successfully",
+        data: information,
+      });
+    } catch (error) {
+      console.error("Edit information error:", error);
+
+      // If something fails after multer uploaded a new file,
+      // remove the newly uploaded file.
+      if (req.file) {
+        const uploadedFilePath = path.join(
+          __dirname,
+          "..",
+          "uploads",
+          "informations",
+          req.file.filename
+        );
+
+        if (fs.existsSync(uploadedFilePath)) {
+          fs.unlinkSync(uploadedFilePath);
+        }
+      }
+
+      res.status(500).json({
+        error: "Failed to update information",
+      });
+    }
+  }
+);
+
 /*
 |--------------------------------------------------------------------------
 | DELETE INFORMATION

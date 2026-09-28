@@ -163,6 +163,240 @@ router.post(
 
 /*
 |--------------------------------------------------------------------------
+| UPDATE NOTIFICATION
+|--------------------------------------------------------------------------
+| Can update:
+| - title only
+| - file only
+| - type only
+| - active date only
+| - any combination
+|--------------------------------------------------------------------------
+*/
+router.put(
+  "/update/:id",
+  jwtAuth,
+  Authorization(["admin"]),
+  upload.single("file"),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        if (req.file) {
+          const uploadedFilePath = path.join(
+            __dirname,
+            "..",
+            "uploads",
+            "notifications",
+            req.file.filename
+          );
+
+          if (fs.existsSync(uploadedFilePath)) {
+            fs.unlinkSync(
+              uploadedFilePath
+            );
+          }
+        }
+
+        return res.status(400).json({
+          error:
+            "Invalid notification ID",
+        });
+      }
+
+      const notification =
+        await Notif.findById(id);
+
+      if (!notification) {
+        if (req.file) {
+          const uploadedFilePath = path.join(
+            __dirname,
+            "..",
+            "uploads",
+            "notifications",
+            req.file.filename
+          );
+
+          if (fs.existsSync(uploadedFilePath)) {
+            fs.unlinkSync(
+              uploadedFilePath
+            );
+          }
+        }
+
+        return res.status(404).json({
+          error:
+            "Notification not found",
+        });
+      }
+
+      const {
+        title,
+        type,
+        active_date,
+      } = req.body;
+
+      /*
+      |--------------------------------------------------------------------------
+      | CHECK IF SOMETHING WAS PROVIDED
+      |--------------------------------------------------------------------------
+      */
+
+      if (
+        (!title || !title.trim()) &&
+        !type &&
+        !active_date &&
+        !req.file
+      ) {
+        return res.status(400).json({
+          error:
+            "No changes provided",
+        });
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | UPDATE TITLE
+      |--------------------------------------------------------------------------
+      */
+
+      if (title && title.trim()) {
+        notification.title =
+          title.trim();
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | UPDATE TYPE
+      |--------------------------------------------------------------------------
+      */
+
+      if (type) {
+        notification.type = type;
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | UPDATE ACTIVE DATE
+      |--------------------------------------------------------------------------
+      */
+
+      if (active_date) {
+        const parsedDate =
+          new Date(active_date);
+
+        if (
+          Number.isNaN(
+            parsedDate.getTime()
+          )
+        ) {
+          if (req.file) {
+            const uploadedFilePath =
+              path.join(
+                __dirname,
+                "..",
+                "uploads",
+                "notifications",
+                req.file.filename
+              );
+
+            if (
+              fs.existsSync(
+                uploadedFilePath
+              )
+            ) {
+              fs.unlinkSync(
+                uploadedFilePath
+              );
+            }
+          }
+
+          return res.status(400).json({
+            error:
+              "Invalid active date",
+          });
+        }
+
+        notification.active_date =
+          parsedDate;
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | REPLACE FILE
+      |--------------------------------------------------------------------------
+      */
+
+      if (req.file) {
+        const oldFilePath = path.join(
+          __dirname,
+          "..",
+          "uploads",
+          "notifications",
+          notification.fileName
+        );
+
+        if (
+          fs.existsSync(oldFilePath)
+        ) {
+          fs.unlinkSync(oldFilePath);
+        }
+
+        notification.fileName =
+          req.file.filename;
+      }
+
+      await notification.save();
+
+      res.status(200).json({
+        message:
+          "Notification updated successfully",
+        data: notification,
+      });
+    } catch (error) {
+      console.error(
+        "Update notification error:",
+        error
+      );
+
+      /*
+      |--------------------------------------------------------------------------
+      | REMOVE NEW FILE IF UPDATE FAILS
+      |--------------------------------------------------------------------------
+      */
+
+      if (req.file) {
+        const uploadedFilePath =
+          path.join(
+            __dirname,
+            "..",
+            "uploads",
+            "notifications",
+            req.file.filename
+          );
+
+        if (
+          fs.existsSync(
+            uploadedFilePath
+          )
+        ) {
+          fs.unlinkSync(
+            uploadedFilePath
+          );
+        }
+      }
+
+      res.status(500).json({
+        error:
+          "Failed to update notification",
+      });
+    }
+  }
+);
+
+/*
+|--------------------------------------------------------------------------
 | DELETE NOTIFICATION
 |--------------------------------------------------------------------------
 */

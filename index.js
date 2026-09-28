@@ -28,6 +28,7 @@ const facultyRouter = require("./routers/Faculty");
 const facultyUpdate = require("./routers/FacultyUpdate");
 const paperRouter = require("./routers/Paper");
 const carouselRouter = require("./routers/ImageCarousal");
+const PlacementStudentList = require("./routers/placementStudentList");
 
 const app = express();
 
@@ -60,6 +61,8 @@ app.use("/mit/paper", paperRouter);
 app.use("/mit/carousel", carouselRouter);
 // Faculty update APIs (protected)
 app.use("/mit/faculty-update", facultyUpdate);
+
+app.use("/mit/placementstudentlist",PlacementStudentList);
 
 app.use((req, res, next) => {
 	return res.status(404).json(
