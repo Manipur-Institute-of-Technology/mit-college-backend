@@ -343,10 +343,261 @@ router.put(
   }
 );
 
-
 // ============================================================
 // ADMIN UPDATE ANY FACULTY PROFILE
 // PUT /mit/faculty-update/:id
+// ============================================================
+
+router.put(
+  "/:id",
+  JWTAuthentication,
+  Authorization(["admin"]),
+  async (req, res) => {
+    try {
+      // --------------------------------------------------------
+      // Validate Faculty ID
+      // --------------------------------------------------------
+
+      const { id } = req.params;
+
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid faculty ID",
+        });
+      }
+
+      // --------------------------------------------------------
+      // Find Faculty Profile
+      // --------------------------------------------------------
+
+      const faculty =
+        await FacultyProfile.findById(id);
+
+      if (!faculty) {
+        return res.status(404).json({
+          success: false,
+          message: "Faculty profile not found",
+        });
+      }
+
+      // --------------------------------------------------------
+      // Fields admin can update
+      // --------------------------------------------------------
+
+      const allowedFields = [
+        "photoId",
+        "phoneNumber",
+        "contactInfo",
+
+        "namePrefix",
+        "firstName",
+        "middleName",
+        "lastName",
+
+        "sex",
+
+        "dob",
+
+        "departmentId",
+
+        "hod",
+
+        "bios",
+
+        "highestDegree",
+        "expertFields",
+        "roles",
+      ];
+
+      // --------------------------------------------------------
+      // Update allowed fields only
+      // --------------------------------------------------------
+
+      for (const field of allowedFields) {
+        if (
+          Object.prototype.hasOwnProperty.call(
+            req.body,
+            field
+          )
+        ) {
+          faculty[field] = req.body[field];
+        }
+      }
+
+      // --------------------------------------------------------
+      // Validate departmentId if supplied
+      // --------------------------------------------------------
+
+      if (
+        Object.prototype.hasOwnProperty.call(
+          req.body,
+          "departmentId"
+        )
+      ) {
+        if (
+          req.body.departmentId &&
+          !mongoose.Types.ObjectId.isValid(
+            req.body.departmentId
+          )
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid department ID",
+          });
+        }
+
+        faculty.departmentId =
+          req.body.departmentId || null;
+      }
+
+      // --------------------------------------------------------
+      // Validate DOB if supplied
+      // --------------------------------------------------------
+
+      if (
+        Object.prototype.hasOwnProperty.call(
+          req.body,
+          "dob"
+        )
+      ) {
+        if (!req.body.dob) {
+          return res.status(400).json({
+            success: false,
+            message: "Date of birth is required",
+          });
+        }
+
+        const dob =
+          new Date(req.body.dob);
+
+        if (
+          Number.isNaN(
+            dob.getTime()
+          )
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid date of birth",
+          });
+        }
+
+        faculty.dob = dob;
+      }
+
+      // --------------------------------------------------------
+      // Validate hod if supplied
+      // --------------------------------------------------------
+
+      if (
+        Object.prototype.hasOwnProperty.call(
+          req.body,
+          "hod"
+        )
+      ) {
+        if (
+          typeof req.body.hod !== "boolean"
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: "hod must be a boolean",
+          });
+        }
+
+        faculty.hod = req.body.hod;
+      }
+
+      // --------------------------------------------------------
+      // Save faculty
+      // --------------------------------------------------------
+
+      await faculty.save();
+
+      // --------------------------------------------------------
+      // Success
+      // --------------------------------------------------------
+
+      return res.status(200).json({
+        success: true,
+        message: "Faculty profile updated successfully",
+        data: faculty,
+      });
+
+    } catch (error) {
+
+      // --------------------------------------------------------
+      // Mongoose Validation Error
+      // --------------------------------------------------------
+
+      if (
+        error instanceof
+        mongoose.Error.ValidationError
+      ) {
+        const errors =
+          Object.values(
+            error.errors
+          ).map((err) => ({
+            field: err.path,
+            value: err.value,
+            kind: err.kind,
+            message: err.message,
+          }));
+
+        return res.status(400).json({
+          success: false,
+          message:
+            "Faculty validation failed",
+          errors,
+        });
+      }
+
+      // --------------------------------------------------------
+      // Cast Error
+      // --------------------------------------------------------
+
+      if (
+        error instanceof
+        mongoose.Error.CastError
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            `Invalid value for ${error.path}`,
+          field: error.path,
+          value: error.value,
+          kind: error.kind,
+        });
+      }
+
+      // --------------------------------------------------------
+      // Duplicate Key
+      // --------------------------------------------------------
+
+      if (error.code === 11000) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Duplicate value already exists",
+          fields: error.keyValue,
+        });
+      }
+
+      // --------------------------------------------------------
+      // Other Error
+      // --------------------------------------------------------
+
+      return res.status(500).json({
+        success: false,
+        message:
+          error.message ||
+          "Unable to update faculty profile",
+      });
+    }
+  }
+);
+
+// ============================================================
+// Faculty UPDATE ANY FACULTY Photo
 // ============================================================
 
 router.put(
