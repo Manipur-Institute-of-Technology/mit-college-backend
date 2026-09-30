@@ -76,6 +76,10 @@ const AicteVaaniSchema = new mongoose.Schema(
       },
     },
 
+    // ==========================================================
+    // ATTACHMENTS
+    // FILE UPLOAD ONLY
+    // ==========================================================
     attachments: [
       {
         id: {
@@ -93,9 +97,30 @@ const AicteVaaniSchema = new mongoose.Schema(
           default: "",
           trim: true,
         },
+
+        originalName: {
+          type: String,
+          default: "",
+          trim: true,
+        },
+
+        mimeType: {
+          type: String,
+          default: "",
+          trim: true,
+        },
+
+        size: {
+          type: Number,
+          default: 0,
+        },
       },
     ],
 
+    // ==========================================================
+    // EXTRA LINKS
+    // FILE UPLOAD ONLY
+    // ==========================================================
     extraLinks: [
       {
         id: {
@@ -112,6 +137,23 @@ const AicteVaaniSchema = new mongoose.Schema(
           type: String,
           default: "",
           trim: true,
+        },
+
+        originalName: {
+          type: String,
+          default: "",
+          trim: true,
+        },
+
+        mimeType: {
+          type: String,
+          default: "",
+          trim: true,
+        },
+
+        size: {
+          type: Number,
+          default: 0,
         },
       },
     ],
