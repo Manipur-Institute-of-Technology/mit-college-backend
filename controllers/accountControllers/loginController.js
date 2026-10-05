@@ -3,6 +3,16 @@ const FacultyProfile = require("../../model/facultyProfile");
 
 const apiResponse = require("../../utils/apiResponse");
 
+// =====================================================
+// MAXIMUM ACTIVE LOGIN TOKENS
+// =====================================================
+
+const MAX_ACTIVE_TOKENS = 3;
+
+// =====================================================
+// LOGIN
+// =====================================================
+
 const loginPostHandler = async (req, res) => {
 	try {
 		const {
@@ -21,7 +31,9 @@ const loginPostHandler = async (req, res) => {
 		if (accountType === "admin") {
 			// Admin can ONLY use email + password
 			if (!email || !password) {
-				throw new Error("Admin email and password required");
+				throw new Error(
+					"Admin email and password required",
+				);
 			}
 
 			account = await Account.findAndCheckCredential(
@@ -44,7 +56,9 @@ const loginPostHandler = async (req, res) => {
 
 			// Must be exactly 6 digits
 			if (!/^\d{6}$/.test(cleanSecurityCode)) {
-				throw new Error("Invalid security code");
+				throw new Error(
+					"Invalid security code",
+				);
 			}
 
 			// Find faculty profile
@@ -54,7 +68,9 @@ const loginPostHandler = async (req, res) => {
 				});
 
 			if (!facultyProfile) {
-				throw new Error("Invalid security code");
+				throw new Error(
+					"Invalid security code",
+				);
 			}
 
 			// Find associated faculty account
@@ -64,7 +80,9 @@ const loginPostHandler = async (req, res) => {
 			});
 
 			if (!account) {
-				throw new Error("Faculty account not found");
+				throw new Error(
+					"Faculty account not found",
+				);
 			}
 		}
 
@@ -89,7 +107,9 @@ const loginPostHandler = async (req, res) => {
 		// =====================================================
 
 		else {
-			throw new Error("Invalid login credentials");
+			throw new Error(
+				"Invalid login credentials",
+			);
 		}
 
 		// =====================================================
@@ -100,19 +120,41 @@ const loginPostHandler = async (req, res) => {
 			await account.generateAuthToken();
 
 		// =====================================================
+		// LIMIT ACTIVE TOKENS TO 3
+		// =====================================================
+
+		if (
+			Array.isArray(account.tokens) &&
+			account.tokens.length > MAX_ACTIVE_TOKENS
+		) {
+			// Keep only the latest 3 tokens
+			account.tokens =
+				account.tokens.slice(
+					-MAX_ACTIVE_TOKENS,
+				);
+
+			await account.save();
+		}
+
+		// =====================================================
 		// RESPONSE
 		// =====================================================
 
 		res.status(202).send(
 			apiResponse({
-				message: "account login successful",
+				message:
+					"account login successful",
+
 				account: {
 					_id: account._id,
-					accountType: account.accountType,
+					accountType:
+						account.accountType,
 					email: account.email,
-					username: account.username,
+					username:
+						account.username,
 					status: account.status,
 				},
+
 				token,
 			}),
 		);
@@ -120,8 +162,10 @@ const loginPostHandler = async (req, res) => {
 	} catch (err) {
 		res.status(400).send(
 			apiResponse(null, {
-				code: "AUTHETICATION_FAILURE",
-				message: "invalid credential",
+				code:
+					"AUTHETICATION_FAILURE",
+				message:
+					"invalid credential",
 			}),
 		);
 	}

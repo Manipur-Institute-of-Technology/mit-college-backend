@@ -249,9 +249,21 @@ router.put(
   upload.single("photo"),
   async (req, res) => {
     try {
-      const authority = await Authority.findById(req.params.id);
+      const authority = await Authority.findById(
+        req.params.id
+      );
+
+      /*
+       * =======================================================
+       * AUTHORITY NOT FOUND
+       * =======================================================
+       */
 
       if (!authority) {
+        /*
+         * Remove newly uploaded photo if
+         * authority does not exist
+         */
         if (req.file) {
           const filePath = path.join(
             __dirname,
@@ -269,20 +281,41 @@ router.put(
         });
       }
 
-      /**
-       * Validate position if it is being changed
+      /*
+       * =======================================================
+       * VALIDATE POSITION IF PROVIDED
+       * =======================================================
        */
-      let newPosition = authority.position;
 
-      if (req.body.position) {
+      let newPosition =
+        authority.position;
+
+      if (
+        req.body.position !==
+        undefined
+      ) {
         if (
-          /^vice[-\s]?chancellor$/i.test(req.body.position) ||
-          /^vc$/i.test(req.body.position)
+          /^vice[-\s]?chancellor$/i.test(
+            req.body.position
+          ) ||
+          /^vc$/i.test(
+            req.body.position
+          )
         ) {
-          newPosition = "Vice-Chancellor";
-        } else if (/^principal$/i.test(req.body.position)) {
-          newPosition = "Principal";
+          newPosition =
+            "Vice-Chancellor";
+        } else if (
+          /^principal$/i.test(
+            req.body.position
+          )
+        ) {
+          newPosition =
+            "Principal";
         } else {
+          /*
+           * Remove newly uploaded photo
+           * because position is invalid
+           */
           if (req.file) {
             const filePath = path.join(
               __dirname,
@@ -290,37 +323,57 @@ router.put(
               req.file.filename
             );
 
-            if (fs.existsSync(filePath)) {
+            if (
+              fs.existsSync(filePath)
+            ) {
               fs.unlinkSync(filePath);
             }
           }
 
           return res.status(400).json({
-            error: "Position must be Vice-Chancellor or Principal",
+            error:
+              "Position must be Vice-Chancellor or Principal",
           });
         }
       }
 
-      /**
-       * If changing role, make sure another record
-       * with that role does not already exist.
+      /*
+       * =======================================================
+       * CHECK DUPLICATE POSITION
+       * =======================================================
        */
-      if (newPosition !== authority.position) {
-        const existingAuthority = await Authority.findOne({
-          position: newPosition,
-          _id: { $ne: authority._id },
-        });
+
+      if (
+        newPosition !==
+        authority.position
+      ) {
+        const existingAuthority =
+          await Authority.findOne({
+            position:
+              newPosition,
+            _id: {
+              $ne: authority._id,
+            },
+          });
 
         if (existingAuthority) {
+          /*
+           * Remove newly uploaded photo
+           */
           if (req.file) {
-            const filePath = path.join(
-              __dirname,
-              "../uploads/authority",
-              req.file.filename
-            );
+            const filePath =
+              path.join(
+                __dirname,
+                "../uploads/authority",
+                req.file.filename
+              );
 
-            if (fs.existsSync(filePath)) {
-              fs.unlinkSync(filePath);
+            if (
+              fs.existsSync(filePath)
+            ) {
+              fs.unlinkSync(
+                filePath
+              );
             }
           }
 
@@ -330,53 +383,135 @@ router.put(
         }
       }
 
-      /**
-       * Replace old photo if new photo uploaded
+      /*
+       * =======================================================
+       * REPLACE OLD PHOTO
+       * =======================================================
        */
-      if (req.file) {
-        if (authority.photo) {
-          const oldPhotoPath = path.join(
-            __dirname,
-            "../uploads/authority",
-            authority.photo
-          );
 
-          if (fs.existsSync(oldPhotoPath)) {
-            fs.unlinkSync(oldPhotoPath);
+      if (req.file) {
+        /*
+         * Delete old photo
+         */
+        if (authority.photo) {
+          const oldPhotoPath =
+            path.join(
+              __dirname,
+              "../uploads/authority",
+              authority.photo
+            );
+
+          if (
+            fs.existsSync(
+              oldPhotoPath
+            )
+          ) {
+            fs.unlinkSync(
+              oldPhotoPath
+            );
           }
         }
 
-        authority.photo = req.file.filename;
+        /*
+         * Save new photo filename
+         */
+        authority.photo =
+          req.file.filename;
       }
 
-      /**
-       * Update fields
+      /*
+       * =======================================================
+       * UPDATE FIELDS
+       * =======================================================
        */
-      authority.position = newPosition;
 
-      if (req.body.name) {
-        authority.name = req.body.name.trim();
+      authority.position =
+        newPosition;
+
+      /*
+       * Name
+       *
+       * Use !== undefined so the
+       * field is checked based on
+       * whether it was actually sent.
+       */
+      if (
+        req.body.name !==
+        undefined
+      ) {
+        authority.name =
+          req.body.name.trim();
       }
 
-      if (req.body.info) {
-        authority.info = req.body.info.trim();
+      /*
+       * Header information
+       *
+       * Use !== undefined so the
+       * field is checked based on
+       * whether it was actually sent.
+       */
+      if (
+        req.body.info !==
+        undefined
+      ) {
+        authority.info =
+          req.body.info.trim();
       }
 
-      if (req.body.bios) {
-        authority.bios = req.body.bios.trim();
+      /*
+       * Biography
+       *
+       * IMPORTANT:
+       *
+       * Biography is optional.
+       *
+       * If the frontend sends:
+       *
+       * bios = "Hello"
+       *
+       * it saves "Hello".
+       *
+       * If the frontend sends:
+       *
+       * bios = ""
+       *
+       * it clears the previous biography.
+       */
+      if (
+        req.body.bios !==
+        undefined
+      ) {
+        authority.bios =
+          req.body.bios.trim();
       }
+
+      /*
+       * =======================================================
+       * SAVE
+       * =======================================================
+       */
 
       await authority.save();
 
-      res.status(200).json({
+      /*
+       * =======================================================
+       * SUCCESS RESPONSE
+       * =======================================================
+       */
+
+      return res.status(200).json({
         success: true,
-        message: "Authority updated successfully",
+        message:
+          "Authority updated successfully",
         data: authority,
       });
     } catch (error) {
-      /**
-       * Remove newly uploaded file if update failed
+      /*
+       * =======================================================
+       * REMOVE NEW PHOTO IF UPDATE FAILED
+       * =======================================================
        */
+
       if (req.file) {
         const filePath = path.join(
           __dirname,
@@ -384,13 +519,25 @@ router.put(
           req.file.filename
         );
 
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
+        if (
+          fs.existsSync(filePath)
+        ) {
+          fs.unlinkSync(
+            filePath
+          );
         }
       }
 
-      res.status(400).json({
-        error: error.message,
+      /*
+       * =======================================================
+       * ERROR RESPONSE
+       * =======================================================
+       */
+
+      return res.status(400).json({
+        error:
+          error.message ||
+          "Failed to update authority",
       });
     }
   }

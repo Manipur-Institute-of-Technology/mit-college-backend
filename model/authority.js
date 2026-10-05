@@ -34,7 +34,7 @@ const AuthoritySchema = new Schema(
 
     bios: {
       type: String,
-      required: true,
+      required: false,
     },
   },
   {
