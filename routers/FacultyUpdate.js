@@ -730,7 +730,7 @@ router.put(
       }
 
       /* =====================================================
-         HOD
+        HOD
       ===================================================== */
 
       if (
@@ -742,14 +742,14 @@ router.put(
         let hod = req.body.hod;
 
         /*
-         * JSON request:
-         *
-         * hod: true
-         *
-         * FormData request:
-         *
-         * hod: "true"
-         */
+        * JSON request:
+        *
+        * hod: true
+        *
+        * FormData request:
+        *
+        * hod: "true"
+        */
 
         if (typeof hod === "string") {
           if (hod === "true") {
@@ -762,9 +762,82 @@ router.put(
         if (typeof hod !== "boolean") {
           return res.status(400).json({
             success: false,
-            message:
-              "hod must be a boolean",
+            message: "hod must be a boolean",
           });
+        }
+
+        /*
+        * =====================================================
+        * ONE HOD PER DEPARTMENT
+        * =====================================================
+        *
+        * Only check when this faculty is being made HOD.
+        *
+        * We exclude the current faculty ID so that an existing
+        * HOD can update their own profile without triggering
+        * the duplicate-HOD error.
+        */
+
+        if (hod === true) {
+          const departmentId =
+            Object.prototype.hasOwnProperty.call(
+              req.body,
+              "departmentId"
+            )
+              ? req.body.departmentId
+              : faculty.departmentId;
+
+          /*
+          * A faculty cannot be HOD without a department.
+          */
+
+          if (!departmentId) {
+            return res.status(400).json({
+              success: false,
+              message:
+                "A department is required for a Faculty Head.",
+            });
+          }
+
+          if (
+            !isValidObjectId(departmentId)
+          ) {
+            return res.status(400).json({
+              success: false,
+              message: "Invalid department ID",
+            });
+          }
+
+          /*
+          * Check whether another faculty in the SAME
+          * department is already the HOD.
+          */
+
+          const existingHOD =
+            await FacultyProfile.findOne({
+              departmentId: departmentId,
+              hod: true,
+              _id: { $ne: id },
+            });
+
+          if (existingHOD) {
+            return res.status(400).json({
+              success: false,
+              message:
+                "There cannot be two Faculty Heads in the same department.",
+              existingHOD: {
+                id: existingHOD._id,
+                name: [
+                  existingHOD.namePrefix,
+                  existingHOD.firstName,
+                  existingHOD.middleName,
+                  existingHOD.lastName,
+                ]
+                  .filter(Boolean)
+                  .join(" "),
+              },
+            });
+          }
         }
 
         faculty.hod = hod;
