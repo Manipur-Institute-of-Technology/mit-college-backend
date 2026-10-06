@@ -5,19 +5,16 @@ const path = require("path");
 const fs = require("fs");
 
 const FacultyProfile = require("../model/facultyProfile");
-
 const JWTAuthentication = require("../middleware/JWTAuthentication");
 const Authorization = require("../middleware/Authorization");
-
 const Paper = require("../model/paper");
 const Account = require("../model/account");
 
 const router = express.Router();
 
-
-// ============================================================
-// FACULTY PHOTO UPLOAD
-// ============================================================
+/* ============================================================
+   FACULTY PHOTO UPLOAD
+============================================================ */
 
 const facultyUploadDir = path.join(
   process.cwd(),
@@ -25,110 +22,178 @@ const facultyUploadDir = path.join(
   "faculty"
 );
 
-
-// Create uploads/faculty if it doesn't exist
 if (!fs.existsSync(facultyUploadDir)) {
   fs.mkdirSync(facultyUploadDir, {
     recursive: true,
   });
 }
 
+/* ============================================================
+   MULTER STORAGE
+============================================================ */
 
-// ============================================================
-// MULTER STORAGE
-// ============================================================
+const facultyPhotoStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, facultyUploadDir);
+  },
 
-const facultyPhotoStorage =
-  multer.diskStorage({
+  filename: (req, file, cb) => {
+    const extension = path
+      .extname(file.originalname)
+      .toLowerCase();
 
-    destination: (req, file, cb) => {
-      cb(
-        null,
-        facultyUploadDir
-      );
-    },
+    const filename = `${Date.now()}-${Math.round(
+      Math.random() * 1e9
+    )}${extension}`;
 
-    filename: (req, file, cb) => {
+    cb(null, filename);
+  },
+});
 
-      const extension =
-        path.extname(
-          file.originalname
-        ).toLowerCase();
+/* ============================================================
+   FILE FILTER
+============================================================ */
 
-      const filename =
-        `${Date.now()}-${Math.round(
-          Math.random() * 1e9
-        )}${extension}`;
+const facultyPhotoFilter = (req, file, cb) => {
+  const allowedTypes = [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+  ];
 
-      cb(
-        null,
-        filename
-      );
-    },
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(
+      new Error(
+        "Only JPG, JPEG, PNG, and WEBP images are allowed"
+      ),
+      false
+    );
+  }
+};
 
-  });
+/* ============================================================
+   MULTER INSTANCE
+============================================================ */
 
+const uploadFacultyPhoto = multer({
+  storage: facultyPhotoStorage,
+  fileFilter: facultyPhotoFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+  },
+});
 
-// ============================================================
-// FILE FILTER
-// ============================================================
+/* ============================================================
+   HELPER FUNCTIONS
+============================================================ */
 
-const facultyPhotoFilter =
-  (req, file, cb) => {
+const isValidObjectId = (value) => {
+  return mongoose.Types.ObjectId.isValid(value);
+};
 
-    const allowedTypes = [
-      "image/jpeg",
-      "image/png",
-      "image/webp",
-    ];
+/*
+ * Normalize array fields.
+ *
+ * Accepts:
+ *   ["Professor", "HOD"]
+ *
+ * Also accepts a JSON string:
+ *   '["Professor", "HOD"]'
+ *
+ * Also accepts a single value:
+ *   "Professor"
+ *
+ * This makes the API easier to use with JSON and FormData.
+ */
+const normalizeArray = (value) => {
+  if (value === undefined || value === null) {
+    return [];
+  }
 
-    if (
-      allowedTypes.includes(
-        file.mimetype
-      )
-    ) {
+  if (Array.isArray(value)) {
+    return value;
+  }
 
-      cb(null, true);
+  if (typeof value === "string") {
+    const trimmed = value.trim();
 
-    } else {
-
-      cb(
-        new Error(
-          "Only JPG, JPEG, and WEBP images are allowed"
-        ),
-        false
-      );
-
+    if (!trimmed) {
+      return [];
     }
 
-  };
+    try {
+      const parsed = JSON.parse(trimmed);
 
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+    } catch (error) {
+      // Not JSON; treat as a single value.
+    }
 
-// ============================================================
-// MULTER INSTANCE
-// ============================================================
+    return [trimmed];
+  }
 
-const uploadFacultyPhoto =
-  multer({
+  return [];
+};
 
-    storage:
-      facultyPhotoStorage,
+/*
+ * Normalize contactInfo.
+ *
+ * Example:
+ *
+ * [
+ *   {
+ *     type: "phone",
+ *     value: "9876543210"
+ *   }
+ * ]
+ *
+ * Can also be supplied as JSON string.
+ */
+const normalizeContactInfo = (value) => {
+  if (value === undefined || value === null) {
+    return [];
+  }
 
-    fileFilter:
-      facultyPhotoFilter,
+  if (Array.isArray(value)) {
+    return value;
+  }
 
-    limits: {
-      fileSize:
-        5 * 1024 * 1024,
-    },
+  if (typeof value === "string") {
+    const trimmed = value.trim();
 
-  });
+    if (!trimmed) {
+      return [];
+    }
 
+    try {
+      const parsed = JSON.parse(trimmed);
 
-// ============================================================
-// FACULTY UPDATE OWN PROFILE
-// PUT /mit/faculty-update/me
-// ============================================================
+      if (Array.isArray(parsed)) {
+        return parsed;
+      }
+
+      if (
+        parsed &&
+        typeof parsed === "object"
+      ) {
+        return [parsed];
+      }
+    } catch (error) {
+      return [];
+    }
+  }
+
+  return [];
+};
+
+/* ============================================================
+   FACULTY UPDATE OWN PROFILE
+   PUT /mit/faculty-update/me
+============================================================ */
 
 router.put(
   "/me",
@@ -136,14 +201,9 @@ router.put(
   Authorization(["faculty"]),
   async (req, res) => {
     try {
-      // --------------------------------------------------------
-      // Find faculty profile using logged-in account
-      // --------------------------------------------------------
-
-      const faculty =
-        await FacultyProfile.findOne({
-          accountId: req.user._id,
-        });
+      const faculty = await FacultyProfile.findOne({
+        accountId: req.user._id,
+      });
 
       if (!faculty) {
         return res.status(404).json({
@@ -152,10 +212,15 @@ router.put(
         });
       }
 
-      // --------------------------------------------------------
-      // Fields faculty can update themselves
-      // --------------------------------------------------------
-
+      /*
+       * Faculty can update their own editable fields.
+       *
+       * Protected:
+       * - accountId
+       * - securityCode
+       * - email
+       * - hod
+       */
       const allowedFields = [
         "photoId",
         "phoneNumber",
@@ -167,7 +232,6 @@ router.put(
         "lastName",
 
         "sex",
-
         "dob",
 
         "departmentId",
@@ -178,10 +242,6 @@ router.put(
         "expertFields",
         "roles",
       ];
-
-      // --------------------------------------------------------
-      // Update only allowed fields
-      // --------------------------------------------------------
 
       for (const field of allowedFields) {
         if (
@@ -194,9 +254,39 @@ router.put(
         }
       }
 
-      // --------------------------------------------------------
-      // Validate departmentId if supplied
-      // --------------------------------------------------------
+      /* ---------------------------------------------
+         PHONE NUMBER
+      --------------------------------------------- */
+
+      if (
+        Object.prototype.hasOwnProperty.call(
+          req.body,
+          "phoneNumber"
+        )
+      ) {
+        faculty.phoneNumber =
+          req.body.phoneNumber;
+      }
+
+      /* ---------------------------------------------
+         CONTACT INFO
+      --------------------------------------------- */
+
+      if (
+        Object.prototype.hasOwnProperty.call(
+          req.body,
+          "contactInfo"
+        )
+      ) {
+        faculty.contactInfo =
+          normalizeContactInfo(
+            req.body.contactInfo
+          );
+      }
+
+      /* ---------------------------------------------
+         DEPARTMENT
+      --------------------------------------------- */
 
       if (
         Object.prototype.hasOwnProperty.call(
@@ -206,7 +296,7 @@ router.put(
       ) {
         if (
           req.body.departmentId &&
-          !mongoose.Types.ObjectId.isValid(
+          !isValidObjectId(
             req.body.departmentId
           )
         ) {
@@ -220,9 +310,9 @@ router.put(
           req.body.departmentId || null;
       }
 
-      // --------------------------------------------------------
-      // Validate DOB if supplied
-      // --------------------------------------------------------
+      /* ---------------------------------------------
+         DOB
+      --------------------------------------------- */
 
       if (
         Object.prototype.hasOwnProperty.call(
@@ -237,14 +327,9 @@ router.put(
           });
         }
 
-        const dob =
-          new Date(req.body.dob);
+        const dob = new Date(req.body.dob);
 
-        if (
-          Number.isNaN(
-            dob.getTime()
-          )
-        ) {
+        if (Number.isNaN(dob.getTime())) {
           return res.status(400).json({
             success: false,
             message: "Invalid date of birth",
@@ -254,41 +339,96 @@ router.put(
         faculty.dob = dob;
       }
 
-      // --------------------------------------------------------
-      // Save faculty
-      // --------------------------------------------------------
+      /* ---------------------------------------------
+         EXPERT FIELDS
+      --------------------------------------------- */
+
+      if (
+        Object.prototype.hasOwnProperty.call(
+          req.body,
+          "expertFields"
+        )
+      ) {
+        if (
+          !Array.isArray(
+            normalizeArray(
+              req.body.expertFields
+            )
+          )
+        ) {
+          return res.status(400).json({
+            success: false,
+            message:
+              "expertFields must be an array",
+          });
+        }
+
+        faculty.expertFields =
+          normalizeArray(
+            req.body.expertFields
+          );
+      }
+
+      /* ---------------------------------------------
+         ROLES / POSITION
+      --------------------------------------------- */
+
+      if (
+        Object.prototype.hasOwnProperty.call(
+          req.body,
+          "roles"
+        )
+      ) {
+        const roles = normalizeArray(
+          req.body.roles
+        );
+
+        const allowedRoles = [
+          "Professor",
+          "Associate Professor",
+          "Assistant Professor",
+          "Guest Faculty",
+        ];
+
+        const invalidRoles = roles.filter(
+          (role) =>
+            !allowedRoles.includes(role)
+        );
+
+        if (invalidRoles.length > 0) {
+          return res.status(400).json({
+            success: false,
+            message:
+              "Invalid faculty role",
+            invalidRoles,
+            allowedRoles,
+          });
+        }
+
+        faculty.roles = roles;
+      }
 
       await faculty.save();
 
-      // --------------------------------------------------------
-      // Success
-      // --------------------------------------------------------
-
       return res.status(200).json({
         success: true,
-        message: "Profile updated successfully",
+        message:
+          "Profile updated successfully",
         data: faculty,
       });
-
     } catch (error) {
-
-      // --------------------------------------------------------
-      // Mongoose Validation Error
-      // --------------------------------------------------------
-
       if (
         error instanceof
         mongoose.Error.ValidationError
       ) {
-        const errors =
-          Object.values(
-            error.errors
-          ).map((err) => ({
-            field: err.path,
-            value: err.value,
-            kind: err.kind,
-            message: err.message,
-          }));
+        const errors = Object.values(
+          error.errors
+        ).map((err) => ({
+          field: err.path,
+          value: err.value,
+          kind: err.kind,
+          message: err.message,
+        }));
 
         return res.status(400).json({
           success: false,
@@ -298,27 +438,18 @@ router.put(
         });
       }
 
-      // --------------------------------------------------------
-      // Cast Error
-      // --------------------------------------------------------
-
       if (
         error instanceof
         mongoose.Error.CastError
       ) {
         return res.status(400).json({
           success: false,
-          message:
-            `Invalid value for ${error.path}`,
+          message: `Invalid value for ${error.path}`,
           field: error.path,
           value: error.value,
           kind: error.kind,
         });
       }
-
-      // --------------------------------------------------------
-      // Duplicate Key
-      // --------------------------------------------------------
 
       if (error.code === 11000) {
         return res.status(400).json({
@@ -328,10 +459,6 @@ router.put(
           fields: error.keyValue,
         });
       }
-
-      // --------------------------------------------------------
-      // Other Error
-      // --------------------------------------------------------
 
       return res.status(500).json({
         success: false,
@@ -343,10 +470,16 @@ router.put(
   }
 );
 
-// ============================================================
-// ADMIN UPDATE ANY FACULTY PROFILE
-// PUT /mit/faculty-update/:id
-// ============================================================
+/* ============================================================
+   ADMIN UPDATE ANY FACULTY PROFILE
+   PUT /mit/faculty-update/:id
+
+   ADMIN CAN UPDATE EVERYTHING EXCEPT:
+
+   - accountId
+   - securityCode
+   - email
+============================================================ */
 
 router.put(
   "/:id",
@@ -354,22 +487,22 @@ router.put(
   Authorization(["admin"]),
   async (req, res) => {
     try {
-      // --------------------------------------------------------
-      // Validate Faculty ID
-      // --------------------------------------------------------
-
       const { id } = req.params;
 
-      if (!mongoose.Types.ObjectId.isValid(id)) {
+      /* ---------------------------------------------
+         VALIDATE FACULTY ID
+      --------------------------------------------- */
+
+      if (!isValidObjectId(id)) {
         return res.status(400).json({
           success: false,
           message: "Invalid faculty ID",
         });
       }
 
-      // --------------------------------------------------------
-      // Find Faculty Profile
-      // --------------------------------------------------------
+      /* ---------------------------------------------
+         FIND FACULTY
+      --------------------------------------------- */
 
       const faculty =
         await FacultyProfile.findById(id);
@@ -377,13 +510,24 @@ router.put(
       if (!faculty) {
         return res.status(404).json({
           success: false,
-          message: "Faculty profile not found",
+          message:
+            "Faculty profile not found",
         });
       }
 
-      // --------------------------------------------------------
-      // Fields admin can update
-      // --------------------------------------------------------
+      /*
+       * =====================================================
+       * ALL ADMIN-EDITABLE FACULTY FIELDS
+       *
+       * NOT INCLUDED:
+       *
+       * accountId
+       * securityCode
+       * email
+       *
+       * Everything else is editable.
+       * =====================================================
+       */
 
       const allowedFields = [
         "photoId",
@@ -396,7 +540,6 @@ router.put(
         "lastName",
 
         "sex",
-
         "dob",
 
         "departmentId",
@@ -410,9 +553,9 @@ router.put(
         "roles",
       ];
 
-      // --------------------------------------------------------
-      // Update allowed fields only
-      // --------------------------------------------------------
+      /* ---------------------------------------------
+         BASIC FIELD UPDATE
+      --------------------------------------------- */
 
       for (const field of allowedFields) {
         if (
@@ -425,9 +568,79 @@ router.put(
         }
       }
 
-      // --------------------------------------------------------
-      // Validate departmentId if supplied
-      // --------------------------------------------------------
+      /* =====================================================
+         PHONE NUMBER
+      ===================================================== */
+
+      if (
+        Object.prototype.hasOwnProperty.call(
+          req.body,
+          "phoneNumber"
+        )
+      ) {
+        if (
+          typeof req.body.phoneNumber !==
+          "string"
+        ) {
+          return res.status(400).json({
+            success: false,
+            message:
+              "phoneNumber must be a string",
+          });
+        }
+
+        faculty.phoneNumber =
+          req.body.phoneNumber.trim();
+      }
+
+      /* =====================================================
+         CONTACT INFO
+      ===================================================== */
+
+      if (
+        Object.prototype.hasOwnProperty.call(
+          req.body,
+          "contactInfo"
+        )
+      ) {
+        const contactInfo =
+          normalizeContactInfo(
+            req.body.contactInfo
+          );
+
+        for (const contact of contactInfo) {
+          if (
+            !contact ||
+            typeof contact !== "object"
+          ) {
+            return res.status(400).json({
+              success: false,
+              message:
+                "Invalid contactInfo format",
+            });
+          }
+
+          if (
+            typeof contact.type !==
+              "string" ||
+            typeof contact.value !==
+              "string"
+          ) {
+            return res.status(400).json({
+              success: false,
+              message:
+                "Each contactInfo item must contain type and value",
+            });
+          }
+        }
+
+        faculty.contactInfo =
+          contactInfo;
+      }
+
+      /* =====================================================
+         DEPARTMENT
+      ===================================================== */
 
       if (
         Object.prototype.hasOwnProperty.call(
@@ -437,7 +650,7 @@ router.put(
       ) {
         if (
           req.body.departmentId &&
-          !mongoose.Types.ObjectId.isValid(
+          !isValidObjectId(
             req.body.departmentId
           )
         ) {
@@ -451,9 +664,9 @@ router.put(
           req.body.departmentId || null;
       }
 
-      // --------------------------------------------------------
-      // Validate DOB if supplied
-      // --------------------------------------------------------
+      /* =====================================================
+         DATE OF BIRTH
+      ===================================================== */
 
       if (
         Object.prototype.hasOwnProperty.call(
@@ -464,30 +677,61 @@ router.put(
         if (!req.body.dob) {
           return res.status(400).json({
             success: false,
-            message: "Date of birth is required",
+            message:
+              "Date of birth is required",
           });
         }
 
-        const dob =
-          new Date(req.body.dob);
+        const dob = new Date(
+          req.body.dob
+        );
 
-        if (
-          Number.isNaN(
-            dob.getTime()
-          )
-        ) {
+        if (Number.isNaN(dob.getTime())) {
           return res.status(400).json({
             success: false,
-            message: "Invalid date of birth",
+            message:
+              "Invalid date of birth",
           });
         }
 
         faculty.dob = dob;
       }
 
-      // --------------------------------------------------------
-      // Validate hod if supplied
-      // --------------------------------------------------------
+      /* =====================================================
+         SEX
+      ===================================================== */
+
+      if (
+        Object.prototype.hasOwnProperty.call(
+          req.body,
+          "sex"
+        )
+      ) {
+        const allowedSex = [
+          "male",
+          "female",
+          "other",
+          "prefer not to say",
+        ];
+
+        if (
+          !allowedSex.includes(
+            req.body.sex
+          )
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid sex value",
+            allowedValues: allowedSex,
+          });
+        }
+
+        faculty.sex = req.body.sex;
+      }
+
+      /* =====================================================
+         HOD
+      ===================================================== */
 
       if (
         Object.prototype.hasOwnProperty.call(
@@ -495,53 +739,155 @@ router.put(
           "hod"
         )
       ) {
-        if (
-          typeof req.body.hod !== "boolean"
-        ) {
+        let hod = req.body.hod;
+
+        /*
+         * JSON request:
+         *
+         * hod: true
+         *
+         * FormData request:
+         *
+         * hod: "true"
+         */
+
+        if (typeof hod === "string") {
+          if (hod === "true") {
+            hod = true;
+          } else if (hod === "false") {
+            hod = false;
+          }
+        }
+
+        if (typeof hod !== "boolean") {
           return res.status(400).json({
             success: false,
-            message: "hod must be a boolean",
+            message:
+              "hod must be a boolean",
           });
         }
 
-        faculty.hod = req.body.hod;
+        faculty.hod = hod;
       }
 
-      // --------------------------------------------------------
-      // Save faculty
-      // --------------------------------------------------------
+      /* =====================================================
+         EXPERT FIELDS
+      ===================================================== */
+
+      if (
+        Object.prototype.hasOwnProperty.call(
+          req.body,
+          "expertFields"
+        )
+      ) {
+        const expertFields =
+          normalizeArray(
+            req.body.expertFields
+          );
+
+        if (
+          !Array.isArray(expertFields)
+        ) {
+          return res.status(400).json({
+            success: false,
+            message:
+              "expertFields must be an array",
+          });
+        }
+
+        faculty.expertFields =
+          expertFields.map((field) =>
+            String(field).trim()
+          );
+      }
+
+      /* =====================================================
+         ROLES / FACULTY POSITION
+      ===================================================== */
+
+      if (
+        Object.prototype.hasOwnProperty.call(
+          req.body,
+          "roles"
+        )
+      ) {
+        const roles = normalizeArray(
+          req.body.roles
+        );
+
+        const allowedRoles = [
+          "Professor",
+          "Associate Professor",
+          "Assistant Professor",
+          "Guest Faculty",
+        ];
+
+        const invalidRoles = roles.filter(
+          (role) =>
+            !allowedRoles.includes(role)
+        );
+
+        if (invalidRoles.length > 0) {
+          return res.status(400).json({
+            success: false,
+            message:
+              "Invalid faculty role",
+            invalidRoles,
+            allowedRoles,
+          });
+        }
+
+        faculty.roles = roles;
+      }
+
+      /* =====================================================
+         PREVENT PROTECTED FIELD CHANGES
+      ===================================================== */
+
+      /*
+       * Even if the frontend sends these fields,
+       * they are deliberately ignored:
+       *
+       * accountId
+       * securityCode
+       * email
+       *
+       * We never assign them to faculty.
+       */
+
+      /* =====================================================
+         SAVE
+      ===================================================== */
 
       await faculty.save();
 
-      // --------------------------------------------------------
-      // Success
-      // --------------------------------------------------------
+      /* =====================================================
+         SUCCESS
+      ===================================================== */
 
       return res.status(200).json({
         success: true,
-        message: "Faculty profile updated successfully",
+        message:
+          "Faculty profile updated successfully",
         data: faculty,
       });
-
     } catch (error) {
-
-      // --------------------------------------------------------
-      // Mongoose Validation Error
-      // --------------------------------------------------------
+      /* =====================================================
+         MONGOOSE VALIDATION ERROR
+      ===================================================== */
 
       if (
         error instanceof
         mongoose.Error.ValidationError
       ) {
-        const errors =
-          Object.values(
-            error.errors
-          ).map((err) => ({
-            field: err.path,
-            value: err.value,
-            kind: err.kind,
-            message: err.message,
-          }));
+        const errors = Object.values(
+          error.errors
+        ).map((err) => ({
+          field: err.path,
+          value: err.value,
+          kind: err.kind,
+          message: err.message,
+        }));
 
         return res.status(400).json({
           success: false,
@@ -551,9 +897,9 @@ router.put(
         });
       }
 
-      // --------------------------------------------------------
-      // Cast Error
-      // --------------------------------------------------------
+      /* =====================================================
+         MONGOOSE CAST ERROR
+      ===================================================== */
 
       if (
         error instanceof
@@ -561,17 +907,16 @@ router.put(
       ) {
         return res.status(400).json({
           success: false,
-          message:
-            `Invalid value for ${error.path}`,
+          message: `Invalid value for ${error.path}`,
           field: error.path,
           value: error.value,
           kind: error.kind,
         });
       }
 
-      // --------------------------------------------------------
-      // Duplicate Key
-      // --------------------------------------------------------
+      /* =====================================================
+         DUPLICATE KEY
+      ===================================================== */
 
       if (error.code === 11000) {
         return res.status(400).json({
@@ -582,9 +927,9 @@ router.put(
         });
       }
 
-      // --------------------------------------------------------
-      // Other Error
-      // --------------------------------------------------------
+      /* =====================================================
+         GENERAL ERROR
+      ===================================================== */
 
       return res.status(500).json({
         success: false,
@@ -596,54 +941,44 @@ router.put(
   }
 );
 
-// ============================================================
-// Faculty UPDATE ANY FACULTY Photo
-// ============================================================
+/* ============================================================
+   FACULTY UPDATE OWN PROFILE PHOTO
+   PUT /mit/faculty-update/me/photo
+============================================================ */
 
 router.put(
   "/me/photo",
-
   JWTAuthentication,
-
   Authorization(["faculty"]),
-
   uploadFacultyPhoto.single("photo"),
-
   async (req, res) => {
-
     let newPhotoPath = null;
 
     try {
-
-      // --------------------------------------------------------
-      // Make sure a photo was uploaded
-      // --------------------------------------------------------
+      /* ---------------------------------------------
+         CHECK UPLOAD
+      --------------------------------------------- */
 
       if (!req.file) {
-
         return res.status(400).json({
           success: false,
-          message: "Profile photo is required",
+          message:
+            "Profile photo is required",
         });
-
       }
 
       newPhotoPath = req.file.path;
 
-
-      // --------------------------------------------------------
-      // Find logged-in faculty
-      // --------------------------------------------------------
+      /* ---------------------------------------------
+         FIND FACULTY
+      --------------------------------------------- */
 
       const faculty =
         await FacultyProfile.findOne({
           accountId: req.user._id,
         });
 
-
       if (!faculty) {
-
-        // New upload is not needed anymore
         if (
           newPhotoPath &&
           fs.existsSync(newPhotoPath)
@@ -653,214 +988,139 @@ router.put(
 
         return res.status(404).json({
           success: false,
-          message: "Faculty profile not found",
+          message:
+            "Faculty profile not found",
         });
-
       }
 
-
-      // --------------------------------------------------------
-      // Remember the previous photo
-      // --------------------------------------------------------
+      /* ---------------------------------------------
+         OLD PHOTO
+      --------------------------------------------- */
 
       const oldPhotoId =
         faculty.photoId || null;
 
-
-      // --------------------------------------------------------
-      // Set the new photo
-      // --------------------------------------------------------
+      /* ---------------------------------------------
+         NEW PHOTO
+      --------------------------------------------- */
 
       faculty.photoId =
         req.file.filename;
 
-
-      // --------------------------------------------------------
-      // IMPORTANT:
-      // Save the new photo reference FIRST
-      // --------------------------------------------------------
+      /* ---------------------------------------------
+         SAVE DATABASE FIRST
+      --------------------------------------------- */
 
       await faculty.save();
 
-
-      // --------------------------------------------------------
-      // Database save succeeded.
-      //
-      // NOW delete the previous physical image.
-      // --------------------------------------------------------
+      /* ---------------------------------------------
+         DELETE OLD PHOTO
+      --------------------------------------------- */
 
       if (
         oldPhotoId &&
         oldPhotoId !== req.file.filename
       ) {
-
         const oldPhotoPath =
           path.join(
             facultyUploadDir,
             oldPhotoId
           );
 
-
         if (
           fs.existsSync(oldPhotoPath)
         ) {
-
           try {
-
             fs.unlinkSync(
               oldPhotoPath
             );
-
-            console.log(
-              `Deleted previous faculty photo: ${oldPhotoId}`
-            );
-
           } catch (deleteError) {
-
-            // Do not fail the request because
-            // the database already has the new photo.
             console.error(
               "Failed to delete previous faculty photo:",
               deleteError
             );
-
           }
-
-        } else {
-
-          console.log(
-            `Previous faculty photo not found: ${oldPhotoId}`
-          );
-
         }
-
       }
 
-
-      // --------------------------------------------------------
-      // Return updated faculty
-      // --------------------------------------------------------
+      /* ---------------------------------------------
+         SUCCESS
+      --------------------------------------------- */
 
       return res.status(200).json({
-
         success: true,
-
         message:
           "Profile photo updated successfully",
-
         data: {
-
           faculty,
-
-          photoId:
-            faculty.photoId,
-
-          photoUrl:
-            `/uploads/faculty/${faculty.photoId}`,
-
+          photoId: faculty.photoId,
+          photoUrl: `/uploads/faculty/${faculty.photoId}`,
         },
-
       });
-
     } catch (error) {
-
-      // --------------------------------------------------------
-      // If database update failed, remove the NEW upload.
-      //
-      // This prevents an orphan image from remaining on disk.
-      // --------------------------------------------------------
+      /* ---------------------------------------------
+         REMOVE NEW FILE IF DATABASE FAILED
+      --------------------------------------------- */
 
       if (
         newPhotoPath &&
         fs.existsSync(newPhotoPath)
       ) {
-
         try {
-
           fs.unlinkSync(
             newPhotoPath
           );
-
         } catch (deleteError) {
-
           console.error(
             "Failed to clean up new photo:",
             deleteError
           );
-
         }
-
       }
 
-
-      // --------------------------------------------------------
-      // Multer errors
-      // --------------------------------------------------------
+      /* ---------------------------------------------
+         MULTER ERROR
+      --------------------------------------------- */
 
       if (
         error instanceof
         multer.MulterError
       ) {
-
         if (
           error.code ===
           "LIMIT_FILE_SIZE"
         ) {
-
           return res.status(400).json({
-
             success: false,
-
             message:
               "Profile photo must be smaller than 5 MB",
-
           });
-
         }
 
-
         return res.status(400).json({
-
           success: false,
-
-          message:
-            error.message,
-
+          message: error.message,
         });
-
       }
 
-
-      // --------------------------------------------------------
-      // General error
-      // --------------------------------------------------------
-
-      console.error(
-        "Faculty photo upload error:",
-        error
-      );
-
+      /* ---------------------------------------------
+         GENERAL ERROR
+      --------------------------------------------- */
 
       return res.status(500).json({
-
         success: false,
-
         message:
           error.message ||
           "Unable to update profile photo",
-
       });
-
     }
-
   }
 );
 
-
-// ============================================================
-// ADMIN DELETE FACULTY
-// DELETE /mit/faculty-update/:accountId
-// ============================================================
+/* ============================================================
+   ADMIN DELETE FACULTY
+   DELETE /mit/faculty-update/:accountId
+============================================================ */
 
 router.delete(
   "/:accountId",
@@ -870,22 +1130,23 @@ router.delete(
     try {
       const { accountId } = req.params;
 
-      // --------------------------------------------------------
-      // Validate Account ID
-      // --------------------------------------------------------
+      /* ---------------------------------------------
+         VALIDATE ACCOUNT ID
+      --------------------------------------------- */
 
-      if (!mongoose.Types.ObjectId.isValid(accountId)) {
+      if (!isValidObjectId(accountId)) {
         return res.status(400).json({
           success: false,
           message: "Invalid account ID",
         });
       }
 
-      // --------------------------------------------------------
-      // Find Account
-      // --------------------------------------------------------
+      /* ---------------------------------------------
+         FIND ACCOUNT
+      --------------------------------------------- */
 
-      const account = await Account.findById(accountId);
+      const account =
+        await Account.findById(accountId);
 
       if (!account) {
         return res.status(404).json({
@@ -894,11 +1155,14 @@ router.delete(
         });
       }
 
-      // --------------------------------------------------------
-      // Check faculty account
-      // --------------------------------------------------------
+      /* ---------------------------------------------
+         CHECK FACULTY ACCOUNT
+      --------------------------------------------- */
 
-      if (account.accountType !== "faculty") {
+      if (
+        account.accountType !==
+        "faculty"
+      ) {
         return res.status(400).json({
           success: false,
           message:
@@ -906,13 +1170,17 @@ router.delete(
         });
       }
 
-      // --------------------------------------------------------
-      // Find Faculty Profile
-      // --------------------------------------------------------
+      /* ---------------------------------------------
+         FIND FACULTY PROFILE
+      --------------------------------------------- */
 
-      const faculty = await FacultyProfile.findOne({
-        accountId: new mongoose.Types.ObjectId(accountId),
-      });
+      const faculty =
+        await FacultyProfile.findOne({
+          accountId:
+            new mongoose.Types.ObjectId(
+              accountId
+            ),
+        });
 
       if (!faculty) {
         return res.status(404).json({
@@ -922,43 +1190,50 @@ router.delete(
         });
       }
 
-      // --------------------------------------------------------
-      // Save photo ID before deleting faculty profile
-      // --------------------------------------------------------
+      /* ---------------------------------------------
+         SAVE PHOTO ID
+      --------------------------------------------- */
 
-      const oldPhotoId = faculty.photoId;
+      const oldPhotoId =
+        faculty.photoId;
 
-      // --------------------------------------------------------
-      // Delete Papers
-      // --------------------------------------------------------
+      /* ---------------------------------------------
+         DELETE PAPERS
+      --------------------------------------------- */
 
-      const paperResult = await Paper.deleteMany({
-        facultyId: faculty._id,
-      });
+      const paperResult =
+        await Paper.deleteMany({
+          facultyId: faculty._id,
+        });
 
-      // --------------------------------------------------------
-      // Delete Faculty Profile
-      // --------------------------------------------------------
+      /* ---------------------------------------------
+         DELETE FACULTY PROFILE
+      --------------------------------------------- */
 
       await FacultyProfile.findByIdAndDelete(
         faculty._id
       );
 
-      // --------------------------------------------------------
-      // Delete Profile Photo
-      // --------------------------------------------------------
+      /* ---------------------------------------------
+         DELETE PHOTO
+      --------------------------------------------- */
 
       if (oldPhotoId) {
         try {
-          const photoPath = path.join(
-            process.cwd(),
-            "uploads",
-            "faculty",
-            oldPhotoId
-          );
+          const photoPath =
+            path.join(
+              process.cwd(),
+              "uploads",
+              "faculty",
+              oldPhotoId
+            );
 
-          if (fs.existsSync(photoPath)) {
-            fs.unlinkSync(photoPath);
+          if (
+            fs.existsSync(photoPath)
+          ) {
+            fs.unlinkSync(
+              photoPath
+            );
           }
         } catch (photoError) {
           console.error(
@@ -968,33 +1243,30 @@ router.delete(
         }
       }
 
-      // --------------------------------------------------------
-      // Delete Account
-      // --------------------------------------------------------
+      /* ---------------------------------------------
+         DELETE ACCOUNT
+      --------------------------------------------- */
 
-      await Account.findByIdAndDelete(accountId);
+      await Account.findByIdAndDelete(
+        accountId
+      );
 
-      // --------------------------------------------------------
-      // Success
-      // --------------------------------------------------------
+      /* ---------------------------------------------
+         SUCCESS
+      --------------------------------------------- */
 
       return res.status(200).json({
         success: true,
         message:
           "Faculty account, profile, photo, and associated papers deleted successfully",
-
         data: {
           accountId: account._id,
-
           facultyId: faculty._id,
-
           photoDeleted: !!oldPhotoId,
-
           papersDeleted:
             paperResult.deletedCount,
         },
       });
-
     } catch (error) {
       return res.status(500).json({
         success: false,
@@ -1005,6 +1277,5 @@ router.delete(
     }
   }
 );
-
 
 module.exports = router;
