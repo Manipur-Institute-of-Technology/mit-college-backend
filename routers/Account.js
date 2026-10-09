@@ -416,9 +416,6 @@ router.post(
 			{
 				location: "body",
 				keys: ["oldPassword"],
-				validatorCb: (val) => passwordValidator(val),
-				error:
-					"password musn't contain password, password should contain min 1 uppercase, 1 lowercase, 1 special character, 1 num and min length of 7",
 			},
 			{
 				location: "body",
