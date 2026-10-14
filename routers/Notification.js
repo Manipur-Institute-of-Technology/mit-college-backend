@@ -11,6 +11,42 @@ const createUploader = require("../middleware/multer");
 
 const upload = createUploader("notifications");
 
+// Upload directory for notification PDFs
+const uploadDirectory = path.join(
+  __dirname,
+  "..",
+  "uploads",
+  "notifications"
+);
+
+// Remove an uploaded file if it is no longer needed
+const removeUploadedFile = (filename) => {
+  if (!filename) return;
+
+  const filePath = path.join(uploadDirectory, filename);
+
+  if (fs.existsSync(filePath)) {
+    fs.unlinkSync(filePath);
+  }
+};
+
+// Validate optional external HTTP/HTTPS links
+const isValidLink = (link) => {
+  if (!link || !link.trim()) {
+    return true;
+  }
+
+  try {
+    const parsedUrl = new URL(link.trim());
+
+    return ["http:", "https:"].includes(
+      parsedUrl.protocol
+    );
+  } catch {
+    return false;
+  }
+};
+
 /*
 |--------------------------------------------------------------------------
 | GET ACTIVE NOTIFICATIONS
@@ -35,6 +71,8 @@ router.get("/", async (req, res) => {
       data: notifications,
     });
   } catch (error) {
+    console.error("Fetch active notifications error:", error);
+
     res.status(500).json({
       error: "Failed to fetch active notifications",
     });
@@ -65,6 +103,8 @@ router.get("/inactive", async (req, res) => {
       data: notifications,
     });
   } catch (error) {
+    console.error("Fetch inactive notifications error:", error);
+
     res.status(500).json({
       error: "Failed to fetch inactive notifications",
     });
@@ -78,17 +118,18 @@ router.get("/inactive", async (req, res) => {
 */
 router.get("/all", async (req, res) => {
   try {
-    const notifications = await Notif.find()
-      .sort({
-        active_date: -1,
-        createdAt: -1,
-      });
+    const notifications = await Notif.find().sort({
+      active_date: -1,
+      createdAt: -1,
+    });
 
     res.status(200).json({
       total: notifications.length,
       data: notifications,
     });
   } catch (error) {
+    console.error("Fetch all notifications error:", error);
+
     res.status(500).json({
       error: "Failed to fetch notifications",
     });
@@ -98,6 +139,15 @@ router.get("/all", async (req, res) => {
 /*
 |--------------------------------------------------------------------------
 | ADD NOTIFICATION
+|--------------------------------------------------------------------------
+| Required:
+| - PDF file
+| - title
+| - active_date
+|
+| Optional:
+| - type
+| - link (advertisement / external information URL)
 |--------------------------------------------------------------------------
 */
 router.post(
@@ -117,15 +167,28 @@ router.post(
         title,
         type,
         active_date,
+        link,
       } = req.body;
 
       if (!title || !title.trim()) {
+        removeUploadedFile(req.file.filename);
+
         return res.status(400).json({
           error: "Title is required",
         });
       }
 
+      if (title.trim().length > 100) {
+        removeUploadedFile(req.file.filename);
+
+        return res.status(400).json({
+          error: "Title cannot exceed 100 characters",
+        });
+      }
+
       if (!active_date) {
+        removeUploadedFile(req.file.filename);
+
         return res.status(400).json({
           error: "Active date is required",
         });
@@ -134,8 +197,18 @@ router.post(
       const parsedDate = new Date(active_date);
 
       if (Number.isNaN(parsedDate.getTime())) {
+        removeUploadedFile(req.file.filename);
+
         return res.status(400).json({
           error: "Invalid active date",
+        });
+      }
+
+      if (!isValidLink(link)) {
+        removeUploadedFile(req.file.filename);
+
+        return res.status(400).json({
+          error: "Please provide a valid HTTP or HTTPS link",
         });
       }
 
@@ -145,6 +218,7 @@ router.post(
         type: type || "miscellaneous",
         active_date: parsedDate,
         submittedBy: req.account._id,
+        link: link ? link.trim() : "",
       });
 
       await notification.save();
@@ -154,6 +228,18 @@ router.post(
         data: notification,
       });
     } catch (error) {
+      console.error("Create notification error:", error);
+
+      if (req.file) {
+        removeUploadedFile(req.file.filename);
+      }
+
+      if (error.name === "ValidationError") {
+        return res.status(400).json({
+          error: error.message,
+        });
+      }
+
       res.status(500).json({
         error: "Failed to create notification",
       });
@@ -170,7 +256,11 @@ router.post(
 | - file only
 | - type only
 | - active date only
+| - link only
 | - any combination
+|
+| Send link: "" to remove an existing link.
+| Omit link to keep the existing link unchanged.
 |--------------------------------------------------------------------------
 */
 router.put(
@@ -184,50 +274,23 @@ router.put(
 
       if (!mongoose.Types.ObjectId.isValid(id)) {
         if (req.file) {
-          const uploadedFilePath = path.join(
-            __dirname,
-            "..",
-            "uploads",
-            "notifications",
-            req.file.filename
-          );
-
-          if (fs.existsSync(uploadedFilePath)) {
-            fs.unlinkSync(
-              uploadedFilePath
-            );
-          }
+          removeUploadedFile(req.file.filename);
         }
 
         return res.status(400).json({
-          error:
-            "Invalid notification ID",
+          error: "Invalid notification ID",
         });
       }
 
-      const notification =
-        await Notif.findById(id);
+      const notification = await Notif.findById(id);
 
       if (!notification) {
         if (req.file) {
-          const uploadedFilePath = path.join(
-            __dirname,
-            "..",
-            "uploads",
-            "notifications",
-            req.file.filename
-          );
-
-          if (fs.existsSync(uploadedFilePath)) {
-            fs.unlinkSync(
-              uploadedFilePath
-            );
-          }
+          removeUploadedFile(req.file.filename);
         }
 
         return res.status(404).json({
-          error:
-            "Notification not found",
+          error: "Notification not found",
         });
       }
 
@@ -235,6 +298,7 @@ router.put(
         title,
         type,
         active_date,
+        link,
       } = req.body;
 
       /*
@@ -242,16 +306,68 @@ router.put(
       | CHECK IF SOMETHING WAS PROVIDED
       |--------------------------------------------------------------------------
       */
-
       if (
         (!title || !title.trim()) &&
         !type &&
         !active_date &&
+        link === undefined &&
         !req.file
       ) {
         return res.status(400).json({
-          error:
-            "No changes provided",
+          error: "No changes provided",
+        });
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | VALIDATE TITLE
+      |--------------------------------------------------------------------------
+      */
+      if (title !== undefined && title.trim()) {
+        if (title.trim().length > 100) {
+          if (req.file) {
+            removeUploadedFile(req.file.filename);
+          }
+
+          return res.status(400).json({
+            error: "Title cannot exceed 100 characters",
+          });
+        }
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | VALIDATE ACTIVE DATE
+      |--------------------------------------------------------------------------
+      */
+      let parsedDate;
+
+      if (active_date !== undefined && active_date !== "") {
+        parsedDate = new Date(active_date);
+
+        if (Number.isNaN(parsedDate.getTime())) {
+          if (req.file) {
+            removeUploadedFile(req.file.filename);
+          }
+
+          return res.status(400).json({
+            error: "Invalid active date",
+          });
+        }
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | VALIDATE EXTERNAL LINK
+      |--------------------------------------------------------------------------
+      */
+      if (link !== undefined && !isValidLink(link)) {
+        if (req.file) {
+          removeUploadedFile(req.file.filename);
+        }
+
+        return res.status(400).json({
+          error: "Please provide a valid HTTP or HTTPS link",
         });
       }
 
@@ -260,10 +376,8 @@ router.put(
       | UPDATE TITLE
       |--------------------------------------------------------------------------
       */
-
-      if (title && title.trim()) {
-        notification.title =
-          title.trim();
+      if (title !== undefined && title.trim()) {
+        notification.title = title.trim();
       }
 
       /*
@@ -271,7 +385,6 @@ router.put(
       | UPDATE TYPE
       |--------------------------------------------------------------------------
       */
-
       if (type) {
         notification.type = type;
       }
@@ -281,115 +394,70 @@ router.put(
       | UPDATE ACTIVE DATE
       |--------------------------------------------------------------------------
       */
-
-      if (active_date) {
-        const parsedDate =
-          new Date(active_date);
-
-        if (
-          Number.isNaN(
-            parsedDate.getTime()
-          )
-        ) {
-          if (req.file) {
-            const uploadedFilePath =
-              path.join(
-                __dirname,
-                "..",
-                "uploads",
-                "notifications",
-                req.file.filename
-              );
-
-            if (
-              fs.existsSync(
-                uploadedFilePath
-              )
-            ) {
-              fs.unlinkSync(
-                uploadedFilePath
-              );
-            }
-          }
-
-          return res.status(400).json({
-            error:
-              "Invalid active date",
-          });
-        }
-
-        notification.active_date =
-          parsedDate;
+      if (parsedDate) {
+        notification.active_date = parsedDate;
       }
 
       /*
       |--------------------------------------------------------------------------
-      | REPLACE FILE
+      | UPDATE EXTERNAL LINK
       |--------------------------------------------------------------------------
       */
-
-      if (req.file) {
-        const oldFilePath = path.join(
-          __dirname,
-          "..",
-          "uploads",
-          "notifications",
-          notification.fileName
-        );
-
-        if (
-          fs.existsSync(oldFilePath)
-        ) {
-          fs.unlinkSync(oldFilePath);
-        }
-
-        notification.fileName =
-          req.file.filename;
+      if (link !== undefined) {
+        notification.link = link.trim();
       }
 
+      /*
+      |--------------------------------------------------------------------------
+      | REPLACE PDF FILE
+      |--------------------------------------------------------------------------
+      */
+      const oldFileName = notification.fileName;
+
+      if (req.file) {
+        notification.fileName = req.file.filename;
+      }
+
+      /*
+      |--------------------------------------------------------------------------
+      | SAVE UPDATED NOTIFICATION
+      |--------------------------------------------------------------------------
+      */
       await notification.save();
 
+      /*
+      |--------------------------------------------------------------------------
+      | DELETE OLD PDF AFTER SUCCESSFUL SAVE
+      |--------------------------------------------------------------------------
+      */
+      if (req.file && oldFileName !== req.file.filename) {
+        removeUploadedFile(oldFileName);
+      }
+
       res.status(200).json({
-        message:
-          "Notification updated successfully",
+        message: "Notification updated successfully",
         data: notification,
       });
     } catch (error) {
-      console.error(
-        "Update notification error:",
-        error
-      );
+      console.error("Update notification error:", error);
 
       /*
       |--------------------------------------------------------------------------
       | REMOVE NEW FILE IF UPDATE FAILS
       |--------------------------------------------------------------------------
       */
-
       if (req.file) {
-        const uploadedFilePath =
-          path.join(
-            __dirname,
-            "..",
-            "uploads",
-            "notifications",
-            req.file.filename
-          );
+        removeUploadedFile(req.file.filename);
+      }
 
-        if (
-          fs.existsSync(
-            uploadedFilePath
-          )
-        ) {
-          fs.unlinkSync(
-            uploadedFilePath
-          );
-        }
+      if (error.name === "ValidationError") {
+        return res.status(400).json({
+          error: error.message,
+        });
       }
 
       res.status(500).json({
-        error:
-          "Failed to update notification",
+        error: "Failed to update notification",
       });
     }
   }
@@ -422,24 +490,17 @@ router.delete(
         });
       }
 
-      const filePath = path.join(
-        __dirname,
-        "..",
-        "uploads",
-        "notifications",
-        notification.fileName
-      );
-
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-
       await notification.deleteOne();
+
+      // Remove the associated PDF after deleting the document.
+      removeUploadedFile(notification.fileName);
 
       res.status(200).json({
         message: "Notification deleted successfully",
       });
     } catch (error) {
+      console.error("Delete notification error:", error);
+
       res.status(500).json({
         error: "Failed to delete notification",
       });

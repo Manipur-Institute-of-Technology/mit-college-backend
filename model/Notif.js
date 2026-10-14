@@ -27,6 +27,13 @@ const NotifSchema = new Schema(
       default: "miscellaneous",
     },
 
+    // NEW: Optional external advertisement or information link
+    link: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
     submittedBy: {
       type: Schema.Types.ObjectId,
       ref: "Account",
